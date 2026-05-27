@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>虛擬世界名勝博物館</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Noto+Serif+TC:wght@400;700&display=swap" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+
+    <style>
+        :root {
+            --museum-dark: #0a0a0f;
+            --museum-wall: #15151c;
+            --museum-gold: #d4af37;
+        }
+        body {
+            font-family: 'Noto Serif TC', serif;
+            background-color: var(--museum-dark);
+            color: #e5e7eb;
+        }
+        .font-playfair { font-family: 'Playfair Display', serif; }
+        
+        /* 隱藏滾動條以增加沉浸感，但保留滾動功能 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: var(--museum-dark); }
+        ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+
+        /* --- 狀態 1: 地圖大廳樣式與動畫 --- */
+        #lobby {
+            background: radial-gradient(circle at center, #2a2a35 0%, var(--museum-dark) 100%);
+        }
+        .map-layer {
+            transition: transform 1.5s cubic-bezier(0.65, 0, 0.35, 1), opacity 1.2s ease;
+        }
+        .zoom-in-active {
+            transform: scale(12);
+            opacity: 0;
+            pointer-events: none;
+        }
+        
+        /* 呼吸燈熱點 (地圖上的光點) */
+        .hotspot {
+            position: absolute;
+            transform: translate(-50%, -50%);
+            width: 16px;
+            height: 16px;
+            background-color: var(--museum-gold);
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 20px var(--museum-gold);
+            transition: all 0.3s ease;
+            z-index: 10;
+        }
+        .hotspot::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border-radius: 50%;
+            background-color: var(--museum-gold);
+            animation: pulse-ring 2.5s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
+            z-index: -1;
+        }
+        .hotspot:hover {
+            transform: translate(-50%, -50%) scale(1.4);
+            background-color: #fde047;
+        }
+        .hotspot-label {
+            position: absolute;
+            top: 25px;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            color: var(--museum-gold);
+            font-weight: 700;
+            font-size: 0.95rem;
+            opacity: 0.7;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+            pointer-events: none;
+            transition: all 0.3s ease;
+        }
+        .hotspot:hover .hotspot-label { opacity: 1; text-shadow: 0 0 10px var(--museum-gold); top: 30px; }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(1); opacity: 0.8; }
+            100% { transform: scale(3.5); opacity: 0; }
+        }
+
+        /* --- 狀態 2: 畫廊展區樣式 --- */
+        /* 畫廊展品框樣式 (模擬真實畫框) */
+        .exhibit-frame {
+            background: #222;
+            padding: 14px;
+            box-shadow: 
+                0 15px 35px rgba(0,0,0,0.8),
+                inset 0 0 0 2px #444,
+                inset 0 0 0 12px #1a1a1a;
+            transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.5s ease;
+        }
+        .exhibit-frame:hover {
+            transform: translateY(-10px) scale(1.02);
+            box-shadow: 
+                0 30px 50px rgba(212, 175, 55, 0.15),
+                inset 0 0 0 2px var(--museum-gold),
+                inset 0 0 0 12px #1a1a1a;
+        }
+        
+        /* 展區投射燈效果 */
+        .spotlight {
+            background: radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.05) 0%, transparent 70%);
+        }
+        
+        /* 進入展區的瀑布流動畫 */
+        .fade-in-up {
+            animation: fadeInUp 1s forwards cubic-bezier(0.2, 0.8, 0.2, 1);
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        @keyframes fadeInUp {
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="overflow-x-hidden min-h-screen flex flex-col antialiased">
+
+    <div id="lobby" class="fixed inset-0 z-50 flex items-center justify-center overflow-hidden">
+        
+        <div id="lobby-ui" class="absolute top-16 left-0 w-full text-center z-20 transition-all duration-700 pointer-events-none">
+            <h1 class="font-playfair text-5xl md:text-7xl text-amber-500 mb-4 drop-shadow-2xl tracking-[0.1em]">WORLD MUSEUM</h1>
+            <h2 class="text-2xl md:text-3xl font-bold text-gray-200 tracking-[0.3em] mb-4">虛擬世界名勝博物館</h2>
+            <p class="text-gray-400 text-sm md:text-base tracking-widest animate-pulse font-light">請點擊地圖上的光芒，穿越進入各洲專屬展區</p>
+        </div>
+
+        <div id="map-layer" class="map-layer relative w-full max-w-6xl aspect-[2/1] mt-24 mx-4">
+            <img src="https://i.imgur.com/SfAXv6V.png" alt="World Map" class="w-full h-full object-contain opacity-30 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+            
+            <div class="hotspot" style="top: 35%; left: 74%;" onclick="enterZone('亞洲', event)">
+                <span class="hotspot-label">亞洲展區</span>
+            </div>
+            <div class="hotspot" style="top: 22%; left: 53%;" onclick="enterZone('歐洲', event)">
+                <span class="hotspot-label">歐洲展區</span>
+            </div>
+            <div class="hotspot" style="top: 25%; left: 18%;" onclick="enterZone('北美洲', event)">
+                <span class="hotspot-label">北美洲展區</span>
+            </div>
+            <div class="hotspot" style="top: 65%; left: 28%;" onclick="enterZone('南美洲', event)">
+                <span class="hotspot-label">南美洲展區</span>
+            </div>
+            <div class="hotspot" style="top: 48%; left: 53%;" onclick="enterZone('非洲', event)">
+                <span class="hotspot-label">非洲展區</span>
+            </div>
+            <div class="hotspot" style="top: 72%; left: 85%;" onclick="enterZone('大洋洲', event)">
+                <span class="hotspot-label">大洋洲展區</span>
+            </div>
+            <div class="hotspot" style="top: 38%; left: 61%;" onclick="enterZone('中東', event)">
+                <span class="hotspot-label">中東展區</span>
+            </div>
+        </div>
+    </div>
+
+    <div id="gallery" class="hidden min-h-screen relative spotlight flex-col bg-[var(--museum-wall)]">
+        
+        <header class="sticky top-0 z-40 bg-[var(--museum-dark)]/90 backdrop-blur-md border-b border-gray-800 shadow-2xl">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex justify-between items-center">
+                <button onclick="returnToLobby()" class="text-gray-400 hover:text-amber-400 transition flex items-center gap-3 group">
+                    <i class="fa-solid fa-arrow-left-long group-hover:-translate-x-2 transition-transform"></i>
+                    <span class="tracking-[0.2em] text-sm">返回大廳</span>
+                </button>
+                <div class="text-center absolute left-1/2 -translate-x-1/2">
+                    <h2 id="gallery-title" class="text-xl md:text-2xl font-bold text-amber-500 tracking-[0.2em]">亞洲展區</h2>
+                </div>
+                
+                <div class="flex items-center gap-4">
+                    <div id="auth-section" class="flex items-center gap-3">
+                        <button id="login-btn" onclick="loginWithGoogle()" class="bg-amber-500/20 hover:bg-amber-500/40 text-amber-400 border border-amber-500/40 px-4 py-2 rounded-sm text-xs md:text-sm tracking-widest transition flex items-center gap-2">
+                            <i class="fa-brands fa-google"></i> Google 登入
+                        </button>
+                        <div id="user-profile" class="hidden flex items-center gap-2">
+                            <img id="user-avatar" src="" alt="Avatar" class="w-8 h-8 rounded-full border border-amber-500/50">
+                            <span id="user-name" class="text-gray-300 text-xs hidden md:inline max-w-[100px] truncate"></span>
+                            <button onclick="logoutFirebase()" class="text-[10px] text-gray-500 hover:text-red-400 transition underline ml-1">登出</button>
+                        </div>
+                    </div>
+
+                    <button id="curator-toggle-btn" onclick="toggleCuratorMode()" class="hidden bg-amber-600/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 px-5 py-2 rounded-sm text-sm tracking-widest transition flex items-center gap-2">
+                        <i class="fa-solid fa-pen-nib"></i> <span class="hidden sm:inline">進入策展模式</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="bg-[#0b0b10] border-b border-gray-800/50">
+                <ul id="zone-tabs" class="flex max-w-7xl mx-auto px-4 min-w-max justify-center gap-2 py-2">
+                    </ul>
+            </div>
+        </header>
+
+        <main class="flex-grow max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full flex flex-col xl:flex-row gap-12 relative">
+            
+            <div class="w-full transition-all duration-500" id="exhibit-area">
+                <div class="flex flex-col items-center mb-16 pb-8 border-b border-gray-800 fade-in-up" style="animation-delay: 0.1s;">
+                    <p class="text-gray-500 tracking-[0.3em] text-xs md:text-sm mb-3">GALLERY OF <span id="gallery-subtitle" class="uppercase">ASIA</span></p>
+                    <p class="text-gray-400 font-light tracking-widest">目前共收錄 <span id="exhibit-count" class="text-amber-500 font-bold text-lg mx-1">0</span> 件文明遺產與創作</p>
+                </div>
+
+                <div id="exhibits-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 pb-24">
+                    </div>
+                
+                <div id="empty-state" class="hidden text-center py-32 bg-[#121218] rounded border border-gray-800 shadow-inner fade-in-up" style="animation-delay: 0.3s;">
+                    <i class="fa-solid fa-landmark-dome text-gray-700 text-6xl mb-6"></i>
+                    <h3 class="text-xl font-medium text-gray-300 tracking-[0.2em] mb-3">此展區尚在籌備中</h3>
+                    <p id="empty-state-desc" class="text-gray-500 tracking-wider text-sm">請先登入 Google 帳號，開啟策展權限。</p>
+                </div>
+            </div>
+
+            <div id="curator-panel" class="hidden w-full xl:w-[400px] shrink-0 xl:sticky xl:top-36 h-fit bg-[#121218] border border-gray-700/50 rounded shadow-2xl p-8 fade-in-up z-30" style="animation-delay: 0.1s;">
+                <div class="flex justify-between items-center mb-8 border-b border-gray-700 pb-4">
+                    <h3 class="text-lg font-bold text-amber-500 tracking-[0.2em]"><i class="fa-solid fa-folder-open mr-2"></i>文物入館登記</h3>
+                    <button onclick="toggleCuratorMode()" class="text-gray-500 hover:text-white transition"><i class="fa-solid fa-xmark text-xl"></i></button>
+                </div>
+                
+                <form id="upload-form" class="space-y-6">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-2 tracking-[0.1em]">展品名稱</label>
+                        <input type="text" id="title" required placeholder="如：吳哥窟" 
+                            class="w-full px-4 py-3 bg-[var(--museum-dark)] border border-gray-700 rounded-sm text-gray-200 focus:ring-1 focus:ring-amber-500 focus:border-amber-500 outline-none transition font-light tracking-wide">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-2 tracking-[0.1em]">上載影像</label>
+                        <div class="flex justify-center px-6 pt-6 pb-8 border border-gray-700 border-dashed rounded-sm bg-[var(--museum-dark)] hover:bg-gray-800 transition cursor-pointer group" onclick="document.getElementById('file-upload').click()">
+                            <div class="space-y-2 text-center">
+                                <img id="image-preview" class="mx-auto h-40 object-contain hidden mb-4 rounded shadow-lg border border-gray-700" alt="預覽">
+                                <div id="upload-icon-text">
+                                    <i class="fa-solid fa-camera-retro text-3xl text-gray-600 mb-3 group-hover:text-amber-500 transition"></i>
+                                    <div class="flex text-sm text-gray-400 justify-center tracking-widest">
+                                        <span class="font-medium">點擊選擇圖片檔案</span>
+                                        <input id="file-upload" type="file" class="sr-only" accept="image/*" required>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-medium text-gray-400 mb-2 tracking-[0.1em] flex justify-between items-center">
+                            文物解說與考據
+                            <span class="text-[10px] text-amber-500/80 border border-amber-500/30 px-2 py-0.5 rounded"><i class="fa-solid fa-robot mr-1"></i>GenAI 輔助</span>
+                        </label>
+                        <textarea id="description" rows="5" required placeholder="寫下該名勝的歷史背景、建築特色，或你想傳達的文化意義..." 
+                            class="w-full px-4 py-3 bg-[var(--museum-dark)] border border-gray-700 rounded-sm text-gray-200 focus:ring-1 focus:ring-amber-500 focus:border-amber-500 outline-none transition resize-none font-light leading-relaxed tracking-wide"></textarea>
+                    </div>
+
+                    <button type="submit" id="submit-btn" class="w-full bg-amber-600/90 hover:bg-amber-500 text-white font-bold py-3 px-4 rounded-sm tracking-[0.2em] transition duration-300 shadow-[0_0_15px_rgba(212,175,55,0.2)] mt-4">
+                        正式展出
+                    </button>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ==========================================
+        // ⚠️ 核心配置：請在此填入你的 Firebase 專案憑證
+        // ==========================================
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyC-Gkh739T9c1n_HNGo_5Ik4gLmlEk7Ao4",
+  authDomain: "worldmuseum-c8358.firebaseapp.com",
+  projectId: "worldmuseum-c8358",
+  storageBucket: "worldmuseum-c8358.firebasestorage.app",
+  messagingSenderId: "457517535059",
+  appId: "1:457517535059:web:e711942fe0f3297f8e9ba6",
+  measurementId: "G-KVQS6K5CB6"
+};
+ 
+
+        // ==========================================
+        // ⚠️ 權限設定：請填入管理員 (Admin) 的 Google Email 或 UID
+        // ==========================================
+        const ADMIN_EMAILS = ["wild816@gmail.com"];
+
+        // 初始化 Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+        const provider = new firebase.auth.GoogleAuthProvider();
+
+        // --- 核心資料與狀態 ---
+        const zones = ['亞洲', '南美洲', '北美洲', '中東', '非洲', '歐洲', '大洋洲'];
+        let currentZone = '亞洲';
+        let curatorMode = false;
+        let currentUser = null;
+        let isAdmin = false;
+
+        // 全域動態數據庫
+        const museumData = { '亞洲': [], '歐洲': [], '南美洲': [], '北美洲': [], '中東': [], '非洲': [], '大洋洲': [] };
+
+        // DOM 元素綁定
+        const lobby = document.getElementById('lobby');
+        const gallery = document.getElementById('gallery');
+        const mapLayer = document.getElementById('map-layer');
+        const lobbyUI = document.getElementById('lobby-ui');
+        
+        const zoneTabs = document.getElementById('zone-tabs');
+        const galleryTitle = document.getElementById('gallery-title');
+        const gallerySubtitle = document.getElementById('gallery-subtitle');
+        const exhibitsGrid = document.getElementById('exhibits-grid');
+        const emptyState = document.getElementById('empty-state');
+        const emptyStateDesc = document.getElementById('empty-state-desc');
+        const exhibitCount = document.getElementById('exhibit-count');
+        const curatorPanel = document.getElementById('curator-panel');
+        const curatorToggleBtn = document.getElementById('curator-toggle-btn');
+        
+        const uploadForm = document.getElementById('upload-form');
+        const fileUpload = document.getElementById('file-upload');
+        const imagePreview = document.getElementById('image-preview');
+        const uploadIconText = document.getElementById('upload-icon-text');
+        const submitBtn = document.getElementById('submit-btn');
+
+        // --- Firebase 身份驗證邏輯 ---
+
+        // 監聽使用者登入狀態
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                currentUser = user;
+                // 檢查是否為 Admin
+                isAdmin = ADMIN_EMAILS.includes(user.email);
+                
+                // 更新 UI
+                document.getElementById('login-btn').classList.add('hidden');
+                document.getElementById('user-profile').classList.remove('hidden');
+                document.getElementById('user-avatar').src = user.photoURL || 'https://via.placeholder.com/150';
+                document.getElementById('user-name').innerText = user.displayName || '策展人';
+                curatorToggleBtn.classList.remove('hidden');
+                emptyStateDesc.innerText = "請點擊右上方「策展模式」，佈置此展區。";
+            } else {
+                currentUser = null;
+                isAdmin = false;
+                
+                // 回復未登入 UI
+                document.getElementById('login-btn').classList.remove('hidden');
+                document.getElementById('user-profile').classList.add('hidden');
+                curatorToggleBtn.classList.add('hidden');
+                curatorPanel.classList.add('hidden');
+                curatorMode = false;
+                emptyStateDesc.innerText = "請先登入 Google 帳號，開啟策展權限。";
+            }
+            // 重新渲染畫面
+            renderExhibits();
+        });
+
+        // Google 登入
+        function loginWithGoogle() {
+            auth.signInWithPopup(provider).catch(error => {
+                console.error("登入失敗:", error);
+                alert("登入失敗: " + error.message);
+            });
+        }
+
+        // 登出
+        function logoutFirebase() {
+            auth.signOut().then(() => {
+                returnToLobby();
+            }).catch(error => {
+                console.error("登出失敗:", error);
+            });
+        }
+
+        // --- 監聽 Firestore 即時資料庫變動 ---
+        function startListeningToDatabase() {
+            db.collection('exhibits').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
+                // 清空原陣列
+                zones.forEach(z => museumData[z] = []);
+                
+                // 分流裝填資料
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    museumData[data.zone].push({
+                        id: doc.id,
+                        ...data
+                    });
+                });
+                
+                // 即時刷新
+                renderExhibits();
+            }, error => {
+                console.error("資料庫讀取出錯: ", error);
+            });
+        }
+
+        // 啟動即時資料監聽
+        startListeningToDatabase();
+
+
+        // --- 場景切換與動畫邏輯 ---
+
+        function enterZone(zone, event) {
+            currentZone = zone;
+            const rect = mapLayer.getBoundingClientRect();
+            let originX = 50, originY = 50;
+            if (event) {
+                originX = ((event.clientX - rect.left) / rect.width) * 100;
+                originY = ((event.clientY - rect.top) / rect.height) * 100;
+            }
+            
+            mapLayer.style.transformOrigin = `${originX}% ${originY}%`;
+            lobbyUI.style.opacity = '0';
+            mapLayer.classList.add('zoom-in-active');
+            
+            setTimeout(() => {
+                lobby.classList.add('hidden');
+                gallery.classList.remove('hidden');
+                gallery.classList.add('flex');
+                
+                curatorMode = false;
+                curatorPanel.classList.add('hidden');
+                
+                initTabs();
+                updateGalleryUI();
+                renderExhibits();
+            }, 1200); 
+        }
+
+        function returnToLobby() {
+            gallery.classList.add('hidden');
+            gallery.classList.remove('flex');
+            lobby.classList.remove('hidden');
+            
+            requestAnimationFrame(() => {
+                mapLayer.classList.remove('zoom-in-active');
+                lobbyUI.style.opacity = '1';
+            });
+        }
+
+        // --- 畫廊 UI 邏輯 ---
+
+        function initTabs() {
+            zoneTabs.innerHTML = '';
+            zones.forEach(zone => {
+                const li = document.createElement('li');
+                const btn = document.createElement('button');
+                btn.innerText = zone;
+                btn.className = `px-4 py-2 text-xs md:text-sm tracking-widest transition-all duration-300 ${
+                    zone === currentZone 
+                    ? 'text-amber-500 border-b-2 border-amber-500 font-bold' 
+                    : 'text-gray-500 hover:text-gray-300 hover:border-b hover:border-gray-600'
+                }`;
+                btn.onclick = () => {
+                    currentZone = zone;
+                    initTabs(); 
+                    updateGalleryUI();
+                    renderExhibits();
+                };
+                li.appendChild(btn);
+                zoneTabs.appendChild(li);
+            });
+        }
+
+        function updateGalleryUI() {
+            galleryTitle.innerText = `${currentZone}展區`;
+            const subMap = {'亞洲':'ASIA', '南美洲':'SOUTH AMERICA', '北美洲':'NORTH AMERICA', '中東':'MIDDLE EAST', '非洲':'AFRICA', '歐洲':'EUROPE', '大洋洲':'OCEANIA'};
+            gallerySubtitle.innerText = subMap[currentZone] || currentZone;
+        }
+
+        function toggleCuratorMode() {
+            if (!currentUser) {
+                alert('請先進行 Google 登入以開啟策展模式。');
+                return;
+            }
+            curatorMode = !curatorMode;
+            if (curatorMode) {
+                curatorPanel.classList.remove('hidden');
+            } else {
+                curatorPanel.classList.add('hidden');
+            }
+        }
+
+        function renderExhibits() {
+            exhibitsGrid.innerHTML = '';
+            const exhibits = museumData[currentZone] || [];
+            exhibitCount.innerText = exhibits.length;
+
+            if (exhibits.length === 0) {
+                emptyState.classList.remove('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                exhibits.forEach((exhibit, index) => {
+                    const card = document.createElement('div');
+                    card.className = `exhibit-frame flex flex-col fade-in-up bg-[#1a1a22] relative`;
+                    card.style.animationDelay = `${0.1 + (index * 0.15)}s`;
+                    
+                    let starsHtml = '';
+                    for (let i = 1; i <= 5; i++) {
+                        starsHtml += `<i class="fa-star ${i <= Math.round(exhibit.rating || 5) ? 'fa-solid text-amber-400' : 'fa-regular text-gray-700'} cursor-pointer hover:text-amber-200 transition" onclick="rateExhibit('${exhibit.id}', ${i})"></i>`;
+                    }
+
+                    // 核心修改 2 & 3：權限審查，只有 Admin 或物件擁有者本人才能看見與觸發「刪除」
+                    const canManage = isAdmin || (currentUser && exhibit.uid === currentUser.uid);
+                    const actionButtonHtml = canManage ? `
+                        <div class="absolute top-6 right-6 z-10">
+                            <button onclick="deleteExhibit('${exhibit.id}', '${exhibit.storagePath}')" class="bg-red-950/80 hover:bg-red-600 border border-red-500/50 text-red-200 text-xs px-3 py-1.5 rounded shadow-lg transition flex items-center gap-1">
+                                <i class="fa-solid fa-trash-can"></i> 撤展
+                            </button>
+                        </div>
+                    ` : '';
+
+                    card.innerHTML = `
+                        ${actionButtonHtml}
+                        <div class="relative w-full aspect-[4/3] overflow-hidden bg-black mb-5 outline outline-1 outline-[#333]">
+                            <img src="${exhibit.imgUrl}" alt="${exhibit.title}" class="w-full h-full object-contain transition duration-[2s] hover:scale-105 opacity-80 hover:opacity-100">
+                        </div>
+                        
+                        <div class="p-2 flex-grow flex flex-col border-t border-gray-700/50 pt-5">
+                            <h4 class="text-xl md:text-2xl font-bold text-gray-100 font-playfair tracking-[0.1em] mb-1 text-center">${exhibit.title}</h4>
+                            <p class="text-[10px] text-amber-500/60 tracking-widest text-center mb-4">策展人：${exhibit.creatorName || '系統預載'}</p>
+                            <p class="text-sm text-gray-400 mb-6 flex-grow leading-relaxed font-light tracking-wide text-justify">${exhibit.description}</p>
+                            
+                            <div class="mt-auto flex justify-between items-center bg-[var(--museum-dark)] p-3 rounded border border-gray-800">
+                                <div class="flex items-center space-x-1 text-xs">
+                                    ${starsHtml}
+                                    <span class="ml-2 text-gray-500 font-sans">(${exhibit.votes || 0})</span>
+                                </div>
+                                <button class="text-amber-500 hover:text-amber-300 text-xs tracking-widest border border-amber-600/30 px-3 py-1.5 rounded-sm transition flex items-center gap-2" onclick="alert('館長 AI 啟動中... 這件展品有什麼故事想問我嗎？')">
+                                    <i class="fa-solid fa-headphones-simple"></i> 導覽
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    exhibitsGrid.appendChild(card);
+                });
+            }
+        }
+
+        // --- 核心修改 4：圖片儲存至 Firebase Storage 與表單上載邏輯 ---
+
+        fileUpload.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                imagePreview.src = URL.createObjectURL(file);
+                imagePreview.classList.remove('hidden');
+                uploadIconText.classList.add('hidden');
+            }
+        });
+
+        uploadForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            if (!currentUser) {
+                alert("請先登入 Google 帳號！");
+                return;
+            }
+
+            const title = document.getElementById('title').value;
+            const description = document.getElementById('description').value;
+            const file = fileUpload.files[0];
+
+            if (!file) {
+                alert("請選擇要上載的展品影像！");
+                return;
+            }
+
+            // 鎖定按鈕防止重複提交
+            submitBtn.disabled = true;
+            submitBtn.innerText = "文物上傳雲端中...";
+
+            // 1. 定義雲端檔案儲存路徑
+            const fileExtension = file.name.split('.').pop();
+            const storagePath = `museum/${currentZone}/${Date.now()}_${currentUser.uid}.${fileExtension}`;
+            const fileRef = storage.ref().child(storagePath);
+
+            // 2. 上載檔案至 Firebase Storage
+            fileRef.put(file).then(snapshot => {
+                // 获取下載網址
+                return snapshot.ref.getDownloadURL();
+            }).then(downloadURL => {
+                // 3. 寫入資訊至 Firebase Firestore
+                return db.collection('exhibits').add({
+                    title: title,
+                    description: description,
+                    imgUrl: downloadURL,      // 雲端儲存空間網址
+                    storagePath: storagePath,  // 保留路徑方便後續刪除檔案
+                    zone: currentZone,
+                    uid: currentUser.uid,      // 綁定上載者 UID
+                    creatorName: currentUser.displayName || "安全帳號",
+                    rating: 5,
+                    votes: 1,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }).then(() => {
+                alert("名勝文物已成功登記並正式展出！");
+                // 重置表單與 UI
+                uploadForm.reset();
+                imagePreview.classList.add('hidden');
+                imagePreview.src = '';
+                uploadIconText.classList.remove('hidden');
+                toggleCuratorMode();
+            }).catch(error => {
+                console.error("上載出錯:", error);
+                alert("上載失敗: " + error.message);
+            }).finally(() => {
+                submitBtn.disabled = false;
+                submitBtn.innerText = "正式展出";
+            });
+        });
+
+        // 刪除文物邏輯
+        function deleteExhibit(docId, storagePath) {
+            if (!confirm("您確定要將此文物移除出館嗎？此操作無法還原。")) return;
+
+            // 1. 先從 Firestore 資料庫中刪除文字紀錄
+            db.collection('exhibits').doc(docId).delete().then(() => {
+                // 2. 如果有雲端儲存路徑，同時將雲端圖片檔案抹除
+                if (storagePath && storagePath !== 'undefined') {
+                    storage.ref().child(storagePath).delete().catch(err => {
+                        console.error("雲端圖片檔案移除失敗或檔案不存在:", err);
+                    });
+                }
+                alert("文物已成功移出展區。");
+            }).catch(error => {
+                alert("移除失敗: " + error.message);
+            });
+        }
+
+        // 互動評分邏輯 (更新資料庫)
+        function rateExhibit(exhibitId, newRating) {
+            const docRef = db.collection('exhibits').doc(exhibitId);
+            db.runTransaction(transaction => {
+                return transaction.get(docRef).then(doc => {
+                    if (!doc.exists) return;
+                    const data = doc.data();
+                    const currentVotes = data.votes || 0;
+                    const currentRating = data.rating || 5;
+                    
+                    const totalScore = currentRating * currentVotes;
+                    const nextVotes = currentVotes + 1;
+                    const nextRating = (totalScore + newRating) / nextVotes;
+
+                    transaction.update(docRef, {
+                        votes: nextVotes,
+                        rating: parseFloat(nextRating.toFixed(1))
+                    });
+                });
+            }).catch(err => {
+                console.error("評分更新失敗:", err);
+            });
+        }
+    </script>
+</body>
+</html>
