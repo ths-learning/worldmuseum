@@ -3,1010 +3,582 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CYBER-VOCAB: 專業詞彙射擊</title>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+    <title>囚徒困境戰略版：動態賽局演算</title>
+    <!-- 本專案使用 Tailwind CSS CDN 僅供開發測試，生產環境請改用 PostCSS 安裝 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
-        :root {
-            --cyan: #00f3ff;
-            --pink: #ff003c;
-            --purple: #b026ff;
-            --dark: #050510;
-            --panel-bg: rgba(5, 8, 24, 0.9);
-            --border-glow: 0 0 10px rgba(0, 243, 255, 0.5);
-        }
-
-        body, html {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            background-color: var(--dark);
-            overflow: hidden;
-            font-family: 'Noto Sans TC', sans-serif;
-            touch-action: none;
-            color: white;
-        }
-
-        #game-container {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            max-width: 600px;
-            margin: 0 auto;
-            background: linear-gradient(to bottom, #050a1f, #020205);
-            box-shadow: 0 0 30px rgba(0, 0, 0, 0.9);
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-
-        canvas {
-            display: block;
-            width: 100%;
-            flex: 1;
-            background-color: transparent;
-            z-index: 1;
-        }
-
-        .grid-overlay {
-            position: absolute;
-            top: 0; left: 0; right: 0; bottom: 110px;
-            background-image: 
-                linear-gradient(rgba(0, 243, 255, 0.04) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(0, 243, 255, 0.04) 1px, transparent 1px);
-            background-size: 30px 30px;
-            pointer-events: none;
-            z-index: 2;
-        }
-
-        #hud-bar {
-            height: 110px;
-            background: var(--panel-bg);
-            border-top: 3px solid var(--cyan);
-            box-shadow: 0 -5px 25px rgba(0, 243, 255, 0.25), inset 0 0 15px rgba(0, 243, 255, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 10px 15px;
-            box-sizing: border-box;
-            z-index: 10;
-            position: relative;
-        }
-
-        #hud-bar::before, #hud-bar::after {
-            content: '';
-            position: absolute;
-            top: -3px;
-            width: 15px;
-            height: 6px;
-            background: white;
-            box-shadow: 0 0 8px white;
-        }
-        #hud-bar::before { left: 10%; }
-        #hud-bar::after { right: 10%; }
-
-        .hud-block {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            height: 100%;
-        }
-
-        .hud-left {
-            flex: 1.2;
-            max-width: 50%;
-        }
-
-        .hud-center {
-            flex: 0.8;
-            align-items: center;
-            border-left: 1px dashed rgba(0, 243, 255, 0.3);
-            border-right: 1px dashed rgba(0, 243, 255, 0.3);
-            margin: 0 5px;
-        }
-
-        .hud-right {
-            flex: 1;
-            align-items: flex-end;
-        }
-
-        .hud-label {
-            color: rgba(0, 243, 255, 0.6);
-            font-size: 11px;
-            letter-spacing: 1px;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-
-        .target-title {
-            color: #ffde00;
-            font-size: 16px;
-            font-weight: 900;
-            margin: 2px 0;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            text-shadow: 0 0 5px rgba(255, 222, 0, 0.3);
-        }
-
-        #switch-timer {
-            font-size: 11px;
-            color: #aaa;
-        }
-
-        .timer-val {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 34px;
-            color: var(--pink);
-            font-weight: 900;
-            line-height: 1;
-            text-shadow: 0 0 8px rgba(255, 0, 60, 0.5);
-        }
-
-        .score-val {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 28px;
-            color: var(--cyan);
-            font-weight: 900;
-            text-shadow: 0 0 8px rgba(0, 243, 255, 0.5);
-        }
-
-        .agent-id {
-            font-size: 11px;
-            color: rgba(255,255,255,0.5);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            max-width: 120px;
-        }
-
-        .screen-modal {
-            position: absolute;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(2, 2, 5, 0.88);
-            backdrop-filter: blur(8px);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 20;
-            padding: 20px;
-            box-sizing: border-box;
-        }
-
-        .cyber-panel {
-            background: rgba(8, 12, 28, 0.95);
-            border: 2px solid var(--cyan);
-            box-shadow: 0 0 25px rgba(0, 243, 255, 0.3), inset 0 0 20px rgba(0, 243, 255, 0.15);
-            width: 100%;
-            max-width: 420px;
-            border-radius: 12px;
-            padding: 25px;
-            box-sizing: border-box;
-            position: relative;
-        }
-        
-        .cyber-panel::before, .cyber-panel::after {
-            content: ''; position: absolute; width: 25px; height: 3px; background: var(--cyan);
-        }
-        .cyber-panel::before { top: -2px; left: -2px; }
-        .cyber-panel::after { bottom: -2px; right: -2px; }
-
-        .glitch-title {
-            font-family: 'Orbitron', 'Noto Sans TC', sans-serif;
-            font-size: 30px;
-            font-weight: 900;
-            text-align: center;
-            color: #fff;
-            text-shadow: 2px 2px 0px var(--pink), -2px -2px 0px var(--cyan);
-            margin-top: 0;
-            margin-bottom: 20px;
-            letter-spacing: 2px;
-            line-height: 1.2;
-        }
-
-        .cyber-input {
-            width: 100%;
-            background: rgba(0, 243, 255, 0.05);
-            border: none;
-            border-bottom: 2px solid var(--cyan);
-            color: var(--cyan);
-            font-family: 'Orbitron', 'Noto Sans TC', sans-serif;
-            font-size: 18px;
-            padding: 10px;
-            box-sizing: border-box;
-            outline: none;
-            text-align: center;
-            margin-bottom: 20px;
-            transition: all 0.3s;
-        }
-        .cyber-input:focus {
-            background: rgba(0, 243, 255, 0.15);
-            box-shadow: 0 5px 15px rgba(0, 243, 255, 0.2);
-        }
-        .cyber-input::placeholder { color: rgba(0, 243, 255, 0.3); }
-
-        .cyber-btn {
-            display: block;
-            width: 100%;
-            background: transparent;
-            color: var(--cyan);
-            border: 1px solid var(--cyan);
-            font-family: 'Noto Sans TC', sans-serif;
-            font-weight: 900;
-            font-size: 18px;
-            padding: 12px;
-            margin-bottom: 15px;
-            cursor: pointer;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            position: relative;
-            overflow: hidden;
-            transition: 0.2s;
-            border-radius: 4px;
-        }
-        .cyber-btn:hover, .cyber-btn:active {
-            background: var(--cyan);
-            color: var(--dark);
-            box-shadow: 0 0 15px var(--cyan);
-        }
-        .cyber-btn.primary {
-            background: rgba(0, 243, 255, 0.1);
-            border: 2px solid var(--cyan);
-            box-shadow: inset 0 0 10px rgba(0, 243, 255, 0.3);
-        }
-        .cyber-btn.danger {
-            color: var(--pink); border-color: var(--pink);
-        }
-        .cyber-btn.danger:hover, .cyber-btn.danger:active {
-            background: var(--pink); color: white; box-shadow: 0 0 15px var(--pink);
-        }
-
-        .notes-container {
-            margin-top: 15px;
-            max-height: 180px;
-            overflow-y: auto;
-            border-top: 1px dashed rgba(0, 243, 255, 0.2);
-            padding-top: 15px;
-        }
-        .notes-container::-webkit-scrollbar { width: 4px; }
-        .notes-container::-webkit-scrollbar-thumb { background: var(--cyan); }
-        
-        .note-item {
-            background: rgba(255, 255, 255, 0.03);
-            border-left: 3px solid var(--purple);
-            margin-bottom: 8px;
-            border-radius: 0 4px 4px 0;
-            overflow: hidden;
-        }
-        .note-summary {
-            padding: 8px 10px;
-            color: #fff;
-            font-weight: bold;
-            font-size: 13px;
-            cursor: pointer;
-            outline: none;
-            user-select: none;
-            background: rgba(0, 243, 255, 0.05);
-        }
-        .note-content {
-            padding: 8px 10px;
-            color: rgba(255,255,255,0.7);
-            font-size: 12px;
-            line-height: 1.5;
-            background: rgba(5, 5, 10, 0.5);
-        }
-        .tag {
-            display: inline-block; background: rgba(176, 38, 255, 0.15);
-            border: 1px solid var(--purple); border-radius: 3px;
-            padding: 2px 6px; margin: 2px; font-size: 11px; color: #e0b3ff;
-        }
-
-        .lb-list {
-            list-style: none; padding: 0; margin: 0 0 20px 0;
-            max-height: 250px; overflow-y: auto;
-        }
-        .lb-list::-webkit-scrollbar { width: 4px; }
-        .lb-list::-webkit-scrollbar-thumb { background: var(--cyan); }
-        .lb-item {
-            display: flex; justify-content: space-between;
-            padding: 10px; border-bottom: 1px solid rgba(0,243,255,0.2);
-            font-family: 'Orbitron', 'Noto Sans TC', sans-serif;
-            font-size: 14px;
-        }
-        .lb-item:nth-child(1) { color: #ffde00; font-weight: bold; font-size: 16px;}
-        .lb-item:nth-child(2) { color: #e2e8f0; font-weight: bold; }
-        .lb-item:nth-child(3) { color: #b45309; font-weight: bold; }
-        
-        .loading-text { text-align: center; color: var(--cyan); font-size: 14px; animation: pulse 1s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-
-        .control-hint {
-            font-size: 13px; color: rgba(255,255,255,0.5); text-align: center;
-            background: rgba(0,0,0,0.5); padding: 8px; border-radius: 5px;
-            margin-bottom: 15px; border-left: 2px solid var(--cyan);
-        }
-
-        .hidden { display: none !important; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; -webkit-tap-highlight-color: transparent; }
+        .hidden-screen { display: none !important; }
+        .btn-active-c { background-color: #10b981 !important; color: white !important; border-color: #34d399 !important; }
+        .btn-active-a { background-color: #ef4444 !important; color: white !important; border-color: #f87171 !important; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .text-xxs { font-size: 0.65rem; line-height: 1rem; }
     </style>
 </head>
-<body>
+<body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col items-center justify-center p-4 selection:bg-indigo-500 selection:text-white">
 
-<div id="game-container">
-    <div class="grid-overlay"></div>
-    
-    <canvas id="gameCanvas"></canvas>
-
-    <div id="hud-bar" class="hidden">
-        <div class="hud-block hud-left">
-            <span class="hud-label">TARGET SYS</span>
-            <span id="target-title" class="target-title">載入中</span>
-            <span id="switch-timer">切換中...</span>
-        </div>
-        <div class="hud-block hud-center">
-            <span class="hud-label">TIME</span>
-            <span id="main-timer" class="timer-val">99</span>
-        </div>
-        <div class="hud-block hud-right">
-            <span class="hud-label">SCORE</span>
-            <span id="score-display" class="score-val">0</span>
-            <span id="hud-agent" class="agent-id">AGENT: ---</span>
+    <!-- 全局提示框 Modal -->
+    <div id="modal-overlay" class="fixed inset-0 bg-black bg-opacity-85 z-50 hidden-screen flex items-center justify-center p-4">
+        <div class="bg-gray-900 rounded-2xl max-w-sm w-full p-6 text-center border border-gray-850 shadow-2xl fade-in">
+            <h3 id="modal-title" class="text-xl font-black mb-2 text-indigo-400">提示</h3>
+            <p id="modal-msg" class="text-gray-300 mb-6 text-sm leading-relaxed"></p>
+            <button onclick="closeModal()" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold transition">確定</button>
         </div>
     </div>
 
-    <div id="home-screen" class="screen-modal">
-        <div class="cyber-panel">
-            <h1 class="glitch-title">CYBER-VOCAB<br><span style="font-size:16px; color:var(--cyan); text-shadow:none; letter-spacing: 1px;">學科專業詞彙特訓</span></h1>
-            
-            <input type="text" id="player-name" class="cyber-input" placeholder="輸入特工代號 (必填)" maxlength="10">
-            
-            <button id="btn-start" class="cyber-btn primary">START MISSION</button>
-            <button id="btn-leaderboard" class="cyber-btn">GLOBAL RANKING</button>
+    <!-- 載入中畫面 -->
+    <div id="screen-loading" class="w-full max-w-md text-center fade-in">
+        <i class="fas fa-microchip fa-spin text-4xl text-indigo-500 mb-4"></i>
+        <p class="text-gray-400 font-mono tracking-wider">正在載入決策矩陣...</p>
+    </div>
 
-            <div class="notes-container">
-                <div style="font-size:12px; color:var(--cyan); margin-bottom:5px; font-weight: bold;">[ 檔案庫 : 溫習筆記 ]</div>
-                <div id="notes-list"></div>
+    <!-- 1. 首頁選單 -->
+    <div id="screen-menu" class="w-full max-w-md hidden-screen fade-in flex flex-col items-center">
+        <div class="text-center mb-8">
+            <div class="inline-flex p-4 bg-indigo-950/45 rounded-3xl border border-indigo-800/40 mb-4 shadow-inner shadow-indigo-500/10">
+                <i class="fas fa-bezier-curve text-5xl text-indigo-400 animate-pulse"></i>
+            </div>
+            <h1 class="text-3xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-500">囚徒困境戰略版</h1>
+            <p class="text-xs text-indigo-300 font-bold tracking-widest uppercase mt-1">賽局理論與動態決策演算法</p>
+            <p class="text-gray-400 mt-3 text-sm leading-relaxed">
+                消除刻板印象，擁抱理性演算。<br>
+                AI 演算子將依據你和對手的歷史決策、分差、剩餘回合數，即時調整最優化期望值。
+            </p>
+        </div>
+
+        <div class="w-full space-y-4">
+            <button onclick="startLocalMode()" class="w-full py-4 bg-gray-900 hover:bg-gray-800 border border-gray-850 rounded-2xl font-bold flex items-center justify-between px-6 transition shadow-lg group">
+                <span class="flex items-center"><i class="fas fa-brain text-xl mr-3 text-indigo-400 group-hover:scale-110 transition"></i> 本地模式 (對戰賽局 AI)</span>
+                <i class="fas fa-chevron-right text-gray-600"></i>
+            </button>
+            <button id="online-mode-btn" onclick="tryOpenOnlineLobby()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-bold flex items-center justify-between px-6 transition shadow-lg shadow-indigo-950/50 group">
+                <span class="flex items-center"><i class="fas fa-globe text-xl mr-3 text-white group-hover:scale-110 transition"></i> 線上模式 (2-6人即時連線)</span>
+                <i class="fas fa-chevron-right text-indigo-200"></i>
+            </button>
+        </div>
+
+        <!-- 規則說明 (更新版) -->
+        <div class="w-full mt-8 bg-gray-900/50 rounded-2xl p-4 border border-gray-850 text-xs text-gray-400 space-y-2">
+            <p class="font-bold text-gray-300 mb-1 flex items-center"><i class="fas fa-info-circle mr-1.5 text-indigo-400"></i> 博弈矩陣結算規則（兩兩對決獨立結算）：</p>
+            <div class="grid grid-cols-2 gap-2 text-left bg-gray-950/50 p-2.5 rounded-lg border border-gray-900 mb-2 font-mono">
+                <div>🤝 雙方皆合作: 各得 <span class="text-emerald-400 font-bold">+20</span></div>
+                <div>⚔️ 雙方皆攻擊: 各得 <span class="text-red-400 font-bold">-20</span> <span class="text-amber-400 text-xxs">(連續攻擊懲罰疊加)</span></div>
+                <div class="col-span-2">🗡️ 單方背刺: 攻擊者 <span class="text-emerald-400 font-bold">+20</span> | 合作者 <span class="text-gray-400 font-bold">0</span></div>
+            </div>
+            <p><i class="fas fa-fire text-amber-500 mr-1"></i> <span class="text-amber-400 font-bold">動態信賴連擊：</span>雙方連續合作，合作分數逐輪升級！</p>
+            <p class="pl-4 font-mono">1輪合作: +20 | 連續2輪: +30 | 連續3輪+: +40</p>
+            <p><i class="fas fa-skull text-red-400 mr-1"></i> <span class="text-red-400 font-bold">攻擊連減：</span>相同玩家連續皆選攻擊，第二輪起額外懲罰。</p>
+            <p class="pl-4 font-mono">連續2輪: 各額外-30 (共-50) | 連續3輪+: 各額外-40 (共-60)</p>
+        </div>
+    </div>
+
+    <!-- 2. 線上大廳 -->
+    <div id="screen-lobby" class="w-full max-w-md hidden-screen fade-in">
+        <button onclick="showScreen('screen-menu')" class="text-gray-400 hover:text-white mb-6 flex items-center text-sm font-semibold">
+            <i class="fas fa-arrow-left mr-2 text-xs"></i> 返回首頁
+        </button>
+        <h2 class="text-2xl font-black mb-6 flex items-center"><i class="fas fa-globe mr-2.5 text-indigo-400"></i>線上聯機大廳 (2~6人)</h2>
+        
+        <div class="bg-gray-900 p-6 rounded-2xl border border-gray-800 mb-6 shadow-xl">
+            <label class="block text-xs font-black uppercase tracking-wider text-gray-400 mb-2">主公暱稱代碼</label>
+            <input type="text" id="player-name-input" placeholder="輸入玩家代號..." class="w-full bg-gray-950 border border-gray-800 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 mb-4 transition font-bold" value="謀士_Player">
+            
+            <button onclick="createRoom()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold transition mb-4 shadow-md shadow-indigo-950/50">
+                創建新戰略通訊室 (2~6人)
+            </button>
+            
+            <div class="relative flex py-3 items-center">
+                <div class="flex-grow border-t border-gray-800"></div>
+                <span class="flex-shrink-0 mx-4 text-gray-500 text-xs font-bold uppercase tracking-wider">或加入已有通訊室</span>
+                <div class="flex-grow border-t border-gray-800"></div>
+            </div>
+            
+            <div class="flex gap-2 mt-4">
+                <input type="text" id="room-code-input" placeholder="4位房號" maxlength="4" class="w-2/3 bg-gray-950 border border-gray-800 rounded-xl px-4 py-3.5 text-white focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-center font-mono text-xl tracking-widest font-bold">
+                <button onclick="joinRoom()" class="w-1/3 py-3.5 bg-gray-850 hover:bg-gray-800 rounded-xl font-bold transition border border-gray-800 text-gray-200">
+                    接入房間
+                </button>
             </div>
         </div>
+        <p class="text-center text-gray-500 text-xs mt-2"><i class="fas fa-shield-alt"></i> 線上模式需要 Firebase 配置，若未配置請使用本地模式</p>
     </div>
 
-    <div id="leaderboard-screen" class="screen-modal hidden">
-        <div class="cyber-panel">
-            <h1 class="glitch-title" style="font-size:22px;">GLOBAL RANKING</h1>
-            <div id="lb-loading" class="loading-text">連線至資料庫中...</div>
-            <ul id="lb-list" class="lb-list hidden">
-                <!-- 排行榜資料 -->
-            </ul>
-            <button id="btn-lb-back" class="cyber-btn danger">BACK TO MENU</button>
+    <!-- 3. 房間等待室 -->
+    <div id="screen-waiting" class="w-full max-w-md hidden-screen fade-in text-center">
+        <h2 class="text-2xl font-black mb-1">戰略通訊室 <span id="display-room-code" class="text-indigo-400 font-mono tracking-wider"></span></h2>
+        <p class="text-gray-400 text-sm mb-6">主公集結中 (最少2人即可開戰，最多6人)</p>
+        
+        <div id="waiting-players-list" class="space-y-3 mb-6">
+            <!-- 玩家列表動態生成 -->
         </div>
+
+        <button id="btn-start-game" onclick="startOnlineGame()" class="w-full py-4 bg-gray-800 text-gray-500 rounded-2xl font-bold transition cursor-not-allowed hidden" disabled>
+            等待聯防就位...
+        </button>
+        <button onclick="leaveRoom()" class="w-full py-3 bg-transparent text-gray-500 hover:text-red-400 mt-4 rounded-xl font-bold transition border border-gray-850 text-sm">
+            終止連線
+        </button>
     </div>
 
-    <div id="game-over-screen" class="screen-modal hidden">
-        <div class="cyber-panel" style="text-align: center;">
-            <h1 class="glitch-title" style="color:var(--pink); text-shadow: 2px 2px 0px white;">MISSION END</h1>
-            
-            <div style="margin: 20px 0;">
-                <div class="hud-label" style="font-size:14px;">FINAL SCORE</div>
-                <div id="final-score" style="font-size: 50px; font-family: 'Orbitron'; color: var(--cyan); font-weight: 900; text-shadow: 0 0 15px var(--cyan);">0</div>
+    <!-- 4. 遊戲主畫面 (決策階段) -->
+    <div id="screen-game" class="w-full max-w-md hidden-screen fade-in">
+        <div class="flex justify-between items-center mb-6 bg-gray-900 p-4 rounded-2xl border border-gray-800 shadow-md">
+            <div>
+                <p class="text-xxs text-gray-500 font-bold uppercase tracking-widest font-mono">ROUND</p>
+                <p class="text-xl font-black text-indigo-400 font-mono"><span id="ui-round">1</span> / 10</p>
             </div>
-
-            <p id="save-status" style="font-size:13px; color:var(--purple); font-weight: bold;">記錄同步中...</p>
-
-            <div class="control-hint" style="text-align:left; margin-top:15px; font-size: 12px; line-height: 1.4;">
-                <b>任務摘要：</b><br>
-                - 需連續命中 <span style="color:var(--cyan); font-weight: bold;">10 發</span> 才能摧毀裝甲敵機。<br>
-                - 戰機具備穿透護盾，相撞 <span style="color:var(--cyan); font-weight: bold;">完全不扣分</span> 且直接穿透。
+            <div class="text-right">
+                <p class="text-xxs text-gray-500 font-bold uppercase tracking-widest font-mono">MY SCORE</p>
+                <p class="text-xl font-black text-amber-400 font-mono" id="ui-my-score">0</p>
             </div>
-
-            <button id="btn-retry" class="cyber-btn primary">RETRY MISSION</button>
-            <button id="btn-home" class="cyber-btn">MAIN MENU</button>
         </div>
+
+        <!-- 決策卡片容器 -->
+        <div id="ui-choice-cards" class="space-y-4 mb-6">
+            <!-- 動態生成對手卡片 -->
+        </div>
+
+        <button id="btn-lock-choice" onclick="submitChoice()" class="w-full py-4 bg-gray-850 text-gray-500 rounded-2xl font-bold text-lg transition shadow-lg cursor-not-allowed border border-gray-800" disabled>
+            決策矩陣未完成
+        </button>
+        
+        <p id="ui-waiting-others" class="text-center text-indigo-400 mt-4 font-semibold text-sm animate-pulse hidden font-mono">
+            <i class="fas fa-network-wired mr-1.5"></i> EVALUATING OPPONENTS DECISIONS...
+        </p>
     </div>
-</div>
 
-<script type="module">
-    // 正確導入 Firebase SDK
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    <!-- 5. 回合結算畫面 -->
+    <div id="screen-round-result" class="w-full max-w-md hidden-screen fade-in">
+        <h2 class="text-2xl font-black text-center mb-1">對決結果日誌</h2>
+        <p class="text-center text-xs text-gray-500 tracking-wider uppercase mb-6 font-mono">STAGE <span id="res-ui-round" class="text-indigo-400 font-bold"></span> REPORT</p>
 
-    // Firebase 設定
-    const firebaseConfig = {
-        apiKey: "AIzaSyDKVsc9Y0Voo0pvU_7ZN90KdmyvKOBr_O0",
-        authDomain: "conceptshoot-f24d7.firebaseapp.com",
-        projectId: "conceptshoot-f24d7",
-        storageBucket: "conceptshoot-f24d7.firebasestorage.app",
-        messagingSenderId: "607132351767",
-        appId: "1:607132351767:web:873a11288bb8bbed868b52",
-        measurementId: "G-9J3Z5CBYN7"
-    };
+        <!-- 本地賽局限定的 AI 遙測面板 -->
+        <div id="local-ai-minds" class="bg-gray-900 rounded-2xl border border-gray-800 p-4 mb-5 shadow-xl hidden">
+            <h3 class="text-xs font-black text-gray-400 mb-3 border-b border-gray-850 pb-2 flex items-center font-mono">
+                <i class="fas fa-satellite-dish mr-1.5 text-indigo-400"></i> GAME-THEORETIC TELEMETRY (AI 演算數據)
+            </h3>
+            <div id="ai-psychology-container" class="space-y-4 text-xs font-mono">
+                <!-- 動態注入 AI 精準遙測 -->
+            </div>
+        </div>
 
-    // 初始化 Firebase
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+        <div class="bg-gray-900 rounded-2xl border border-gray-800 p-4 mb-5 shadow-xl">
+            <h3 class="text-xs font-black text-gray-400 mb-3 border-b border-gray-850 pb-2 flex items-center font-mono">
+                <i class="fas fa-chart-line mr-1.5 text-amber-500"></i> LEADERBOARD (即時積分榜)
+            </h3>
+            <div id="res-ui-leaderboard" class="space-y-2 font-mono">
+                <!-- 動態生成 -->
+            </div>
+        </div>
 
-    // 匿名登入，確保寫入權限 (符合 Firebase 規則)
-    let currentUser = null;
-    signInAnonymously(auth)
-        .then((userCredential) => {
-            currentUser = userCredential.user;
-            console.log("匿名登入成功，UID:", currentUser.uid);
-        })
-        .catch((error) => {
-            console.error("匿名登入失敗，排行榜與儲存功能將無法使用", error);
-        });
+        <div class="bg-gray-900 rounded-2xl border border-gray-800 p-4 mb-6 shadow-xl">
+            <h3 class="text-xs font-black text-gray-400 mb-3 border-b border-gray-850 pb-2 flex items-center font-mono">
+                <i class="fas fa-file-code mr-1.5 text-indigo-400"></i> DECISION MATRIX LOGS (決策交叉比對)
+            </h3>
+            <div id="res-ui-logs" class="space-y-3 max-h-60 overflow-y-auto no-scrollbar text-sm font-mono">
+                <!-- 交叉比對 -->
+            </div>
+        </div>
 
-    // ----------------------------------------------------
-    // DOM 綁定
-    // ----------------------------------------------------
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const container = document.getElementById('game-container');
+        <button id="btn-next-round" onclick="readyForNextRound()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-bold transition shadow-lg shadow-indigo-950/50 text-white">
+            進入下一決策階段 (Next Stage)
+        </button>
+    </div>
 
-    const screens = {
-        home: document.getElementById('home-screen'),
-        hud: document.getElementById('hud-bar'),
-        leaderboard: document.getElementById('leaderboard-screen'),
-        gameover: document.getElementById('game-over-screen')
-    };
+    <!-- 6. 最終結算畫面 -->
+    <div id="screen-final" class="w-full max-w-md hidden-screen fade-in text-center">
+        <div class="inline-flex p-4 bg-indigo-950/30 rounded-full border border-indigo-500/30 mb-4 animate-bounce">
+            <i class="fas fa-trophy text-5xl text-amber-400"></i>
+        </div>
+        <h2 class="text-3xl font-black mb-1 text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-300 to-orange-400 font-mono">SIMULATION COMPLETE</h2>
+        <p class="text-gray-400 text-sm mb-8">賽局終端模擬結算</p>
 
-    const ui = {
-        playerNameInput: document.getElementById('player-name'),
-        btnStart: document.getElementById('btn-start'),
-        btnLb: document.getElementById('btn-leaderboard'),
-        btnLbBack: document.getElementById('btn-lb-back'),
-        btnRetry: document.getElementById('btn-retry'),
-        btnHome: document.getElementById('btn-home'),
-        notesList: document.getElementById('notes-list'),
-        
-        hudScore: document.getElementById('score-display'),
-        hudTarget: document.getElementById('target-title'),
-        hudTimer: document.getElementById('main-timer'),
-        hudSwitch: document.getElementById('switch-timer'),
-        hudAgent: document.getElementById('hud-agent'),
-        
-        lbLoading: document.getElementById('lb-loading'),
-        lbList: document.getElementById('lb-list'),
-        finalScore: document.getElementById('final-score'),
-        saveStatus: document.getElementById('save-status')
-    };
+        <div id="final-leaderboard" class="bg-gray-900 rounded-2xl border border-gray-800 p-4 mb-8 space-y-3 shadow-2xl font-mono">
+            <!-- 終榜 -->
+        </div>
 
-    // ----------------------------------------------------
-    // 專業學科題庫與筆記
-    // ----------------------------------------------------
-    const vocabGroups = [
-        { id: 0, title: "旅遊產品特性", words: ["無形性", "差異性", "互補性", "不可保存性", "帶有風險"] },
-        { id: 1, title: "SMART原則", words: ["明確性", "可衡量性", "一致性", "實際性", "有時限性"] },
-        { id: 2, title: "成功景點的特性", words: ["高品質", "真實性", "獨特性", "吸客能力", "活動選擇及可達度"] },
-        { id: 3, title: "顧客服務的性質", words: ["綜合性", "直接性", "情緒性", "時間性", "應變性"] },
-        { id: 4, title: "優質顧客服務指標", words: ["可靠性", "可信性", "有形性", "關懷性", "反應性"] }
-    ];
+        <button onclick="location.reload()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold transition shadow-lg">
+            重啟戰略模擬
+        </button>
+    </div>
 
-    function generateNotes() {
-        ui.notesList.innerHTML = vocabGroups.map(group => `
-            <details class="note-item">
-                <summary class="note-summary">▶ ${group.title}</summary>
-                <div class="note-content">
-                    ${group.words.map(w => `<span class="tag">${w}</span>`).join('')}
-                </div>
-            </details>
-        `).join('');
-    }
-    generateNotes();
-
-    const cachedName = localStorage.getItem('cyberVocabPlayer');
-    if (cachedName) ui.playerNameInput.value = cachedName;
-
-    // ----------------------------------------------------
-    // 遊戲核心邏輯
-    // ----------------------------------------------------
-    let gameState = 'HOME'; // HOME, PLAYING, GAMEOVER
-    let score = 0;
-    let currentTargetGroupId = 0; 
-    let baseSpeed = 0.5; 
-    let spawnRate = 80;  
-    let frameCount = 0;
-    let animationId;
-    
-    let gameStartTime = 0;
-    const GAME_DURATION = 99;
-    let lastSwitchTime = 0;
-    const SWITCH_INTERVAL = 30000;
-
-    let bullets = [];
-    let enemies = [];
-    let particles = [];
-    let floatingTexts = [];
-    let stars = [];
-
-    for(let i=0; i<80; i++){
-        stars.push({
-            x: Math.random() * 600, y: Math.random() * 800,
-            size: Math.random() * 1.5 + 0.5,
-            speed: Math.random() * 3 + 1,
-            color: Math.random() > 0.6 ? '#00f3ff' : '#ffffff'
-        });
-    }
-
-    const HUD_BAR_HEIGHT = 110;
-    const player = {
-        x: 0, 
-        y: 0,
-        width: 48,
-        height: 58,
-        speed: 8,
-        lastShot: 0,
-        fireRate: 8
-    };
-
-    function resizeCanvas() {
-        canvas.width = container.clientWidth;
-        canvas.height = container.clientHeight - HUD_BAR_HEIGHT; 
-        player.y = canvas.height - 40; 
-        if (player.x === 0) player.x = canvas.width / 2;
-    }
-    window.addEventListener('resize', resizeCanvas);
-    resizeCanvas();
-
-    // 滑動控制
-    let isDragging = false;
-    let startX = 0, playerStartX = 0;
-
-    function startDrag(e) {
-        if(gameState !== 'PLAYING') return;
-        e.preventDefault(); 
-        isDragging = true;
-        startX = e.touches ? e.touches[0].clientX : e.clientX;
-        playerStartX = player.x;
-    }
-
-    function moveDrag(e) {
-        if (!isDragging || gameState !== 'PLAYING') return;
-        e.preventDefault();
-        const currentX = e.touches ? e.touches[0].clientX : e.clientX;
-        player.x = playerStartX + (currentX - startX);
-        if (player.x < player.width/2) player.x = player.width/2;
-        if (player.x > canvas.width - player.width/2) player.x = canvas.width - player.width/2;
-    }
-
-    function endDrag() { isDragging = false; }
-
-    canvas.addEventListener('touchstart', startDrag, {passive: false});
-    canvas.addEventListener('touchmove', moveDrag, {passive: false});
-    canvas.addEventListener('touchend', endDrag);
-    canvas.addEventListener('mousedown', startDrag);
-    canvas.addEventListener('mousemove', moveDrag);
-    window.addEventListener('mouseup', endDrag);
-
-    // UI 切換
-    function switchScreen(activeScreen) {
-        screens.home.classList.add('hidden');
-        screens.hud.classList.add('hidden');
-        screens.leaderboard.classList.add('hidden');
-        screens.gameover.classList.add('hidden');
-
-        if (activeScreen === 'game') {
-            screens.hud.classList.remove('hidden');
-        } else if (screens[activeScreen]) {
-            screens[activeScreen].classList.remove('hidden');
-        }
-    }
-
-    ui.btnStart.addEventListener('click', () => {
-        const pName = ui.playerNameInput.value.trim();
-        if (!pName) {
-            alert('系統提示：請輸入特工代號才能開始任務！');
-            ui.playerNameInput.focus();
-            return;
-        }
-        localStorage.setItem('cyberVocabPlayer', pName);
-        startMission();
-    });
-
-    ui.btnRetry.addEventListener('click', startMission);
-    ui.btnHome.addEventListener('click', () => {
-        gameState = 'HOME';
-        switchScreen('home');
-    });
-
-    // 讀取排行榜 (使用簡潔的 leaderboard 集合)
-    ui.btnLb.addEventListener('click', async () => {
-        switchScreen('leaderboard');
-        ui.lbLoading.classList.remove('hidden');
-        ui.lbList.classList.add('hidden');
-        ui.lbList.innerHTML = '';
-        
+    <!-- Firebase SDKs (僅當存在設定時才會啟用) -->
+    <script type="module">
+        // ********** Firebase 配置檢測 **********
+        // 此區塊會嘗試讀取 __firebase_config (需由後端注入)，若無則完全停用線上模式
+        let firebaseConfig = null;
         try {
-            const leaderboardRef = collection(db, 'leaderboard');
-            const q = query(leaderboardRef, orderBy('score', 'desc'), limit(10));
-            const snapshot = await getDocs(q);
-            let scores = [];
-            snapshot.forEach(doc => scores.push(doc.data()));
+            if (typeof __firebase_config !== 'undefined') {
+                firebaseConfig = JSON.parse(__firebase_config);
+            }
+        } catch(e) { console.warn("Firebase config parse error, online mode disabled."); }
+        
+        const isOnlineEnabled = !!(firebaseConfig && Object.keys(firebaseConfig).length > 0);
+        
+        // 導入 Firebase 模組 (僅當需要時)
+        let initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, deleteField;
+        let app, auth, db;
+        
+        if (isOnlineEnabled) {
+            // 動態導入 Firebase
+            const firebaseMod = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+            const authMod = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+            const firestoreMod = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+            initializeApp = firebaseMod.initializeApp;
+            getAuth = authMod.getAuth;
+            signInAnonymously = authMod.signInAnonymously;
+            onAuthStateChanged = authMod.onAuthStateChanged;
+            getFirestore = firestoreMod.getFirestore;
+            doc = firestoreMod.doc;
+            setDoc = firestoreMod.setDoc;
+            getDoc = firestoreMod.getDoc;
+            updateDoc = firestoreMod.updateDoc;
+            onSnapshot = firestoreMod.onSnapshot;
+            deleteField = firestoreMod.deleteField;
             
-            ui.lbLoading.classList.add('hidden');
-            ui.lbList.classList.remove('hidden');
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        }
+        
+        let currentUser = null;
+        
+        // 輔助函數
+        window.showScreen = function(screenId) {
+            const screens = ['screen-loading', 'screen-menu', 'screen-lobby', 'screen-waiting', 'screen-game', 'screen-round-result', 'screen-final'];
+            screens.forEach(id => document.getElementById(id).classList.add('hidden-screen'));
+            document.getElementById(screenId).classList.remove('hidden-screen');
+        };
+        
+        window.showModal = function(title, msg) {
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-msg').innerHTML = msg;
+            document.getElementById('modal-overlay').classList.remove('hidden-screen');
+        };
+        window.closeModal = function() {
+            document.getElementById('modal-overlay').classList.add('hidden-screen');
+        };
+        
+        // 線上模式入口檢查 (避免未配置 Firebase 導致“網路尚未就緒”)
+        window.tryOpenOnlineLobby = function() {
+            if (!isOnlineEnabled) {
+                showModal('無法使用線上模式', '當前環境未檢測到 Firebase 配置，無法建立網路連線。<br><br>請改用「本地模式」進行遊戲，或聯絡管理員設定 Firebase。');
+                return;
+            }
+            if (!currentUser) {
+                showModal('身分驗證中', '正在與伺服器建立安全連線，請稍後再試。若持續失敗，請使用本地模式。');
+                return;
+            }
+            showScreen('screen-lobby');
+        };
+        
+        // ----- 全域變數 -----
+        let currentMode = ''; 
+        let myId = ''; 
+        let myChoices = {}; 
+        let currentRoomId = null;
+        let unsubscribeRoom = null;
+        let isHost = false;
+        let isSubmitting = false;    // 避免重複提交
+        let localState = null;
+        let onlineState = null;
+        
+        // ==========================================
+        // 核心計分演算法 (支援合作連擊 + 攻擊連減 + 新版背刺)
+        // ==========================================
+        function calculateRound(playersMap, choicesMap, currentCoopStreaks, currentAttackStreaks) {
+            const uids = Object.keys(playersMap);
+            let roundPoints = {};
+            let logs = [];
+            let nextCoopStreaks = { ...currentCoopStreaks };
+            let nextAttackStreaks = { ...currentAttackStreaks };
             
-            if (scores.length === 0) {
-                ui.lbList.innerHTML = '<li class="lb-item" style="justify-content:center;">目前尚無紀錄</li>';
-            } else {
-                ui.lbList.innerHTML = scores.map((s, i) => `
-                    <li class="lb-item">
-                        <span>#${i+1}</span>
-                        <span style="flex:1; text-align:center;">${s.name}</span>
-                        <span>${s.score} PTS</span>
-                    </li>
-                `).join('');
-            }
-        } catch (e) {
-            ui.lbLoading.innerText = '排行榜讀取失敗：請檢查網路或 Firebase 設定';
-            console.error(e);
-        }
-    });
-
-    ui.btnLbBack.addEventListener('click', () => {
-        switchScreen('home');
-    });
-
-    function startMission() {
-        score = 0;
-        baseSpeed = canvas.height * 0.001; 
-        spawnRate = 80;
-        
-        currentTargetGroupId = Math.floor(Math.random() * vocabGroups.length);
-        const now = Date.now();
-        gameStartTime = now;
-        lastSwitchTime = now;
-        
-        bullets = [];
-        enemies = [];
-        particles = [];
-        floatingTexts = [];
-        frameCount = 0;
-        
-        player.lastShot = 0; 
-        isDragging = false;
-        
-        resizeCanvas();
-
-        const agentName = localStorage.getItem('cyberVocabPlayer') || 'AGENT';
-        ui.hudAgent.innerText = `AGENT: ${agentName}`;
-
-        gameState = 'PLAYING';
-        switchScreen('game');
-    }
-
-    async function gameOver() {
-        gameState = 'GAMEOVER';
-        switchScreen('gameover');
-        
-        ui.finalScore.innerText = score;
-        const pName = ui.playerNameInput.value.trim() || 'Anonymous';
-        
-        // 上傳成績 (僅當已匿名登入成功時)
-        if (db && currentUser) {
-            ui.saveStatus.innerText = '同步成績至雲端中央資料庫...';
-            ui.saveStatus.style.color = '#b026ff';
-            try {
-                const leaderboardRef = collection(db, 'leaderboard');
-                await addDoc(leaderboardRef, {
-                    name: pName,
-                    score: score,
-                    timestamp: Date.now(),
-                    uid: currentUser.uid
-                });
-                ui.saveStatus.innerText = '✅ 成績成功上傳雲端！';
-                ui.saveStatus.style.color = '#00f3ff';
-            } catch (e) {
-                console.error("上傳失敗", e);
-                ui.saveStatus.innerText = '⚠️ 同步失敗 (已保存於本地)';
-                ui.saveStatus.style.color = '#ff003c';
-            }
-        } else {
-            ui.saveStatus.innerText = '單機模式 (未連結雲端資料庫)';
-            ui.saveStatus.style.color = '#aaa';
-        }
-    }
-
-    // 特效函數
-    function createExplosion(x, y, color, isMassive = false) {
-        const count = isMassive ? 35 : 15;
-        const force = isMassive ? 14 : 8;
-        for (let i = 0; i < count; i++) {
-            particles.push({
-                x: x, y: y,
-                vx: (Math.random() - 0.5) * force,
-                vy: (Math.random() - 0.5) * force,
-                life: 1, color: color,
-                size: Math.random() * (isMassive ? 5 : 3) + 2
-            });
-        }
-    }
-
-    function createFloatingText(x, y, text, color, fontSize = 24) {
-        floatingTexts.push({
-            x: x, y: y, text: text, color: color, life: 1, vy: -1.5, fontSize: fontSize
-        });
-    }
-
-    function spawnEnemy() {
-        let groupId = Math.random() < 0.5 ? currentTargetGroupId : 
-            [0,1,2,3,4].filter(id => id !== currentTargetGroupId)[Math.floor(Math.random() * 4)];
-        
-        const group = vocabGroups[groupId];
-        const word = group.words[Math.floor(Math.random() * group.words.length)];
-        
-        const width = Math.max(100, (word.length * 16) + 30);
-        const height = 44; 
-        
-        const elapsedGame = Math.max(0, (Date.now() - gameStartTime) / 1000);
-        const timeProgress = Math.min(1, elapsedGame / GAME_DURATION);
-        const currentEnemySpeed = baseSpeed + (timeProgress * baseSpeed * 3.5) + (Math.random() * 0.8);
-        
-        enemies.push({
-            x: Math.random() * (canvas.width - width) + width/2,
-            y: -height, width: width, height: height,
-            text: word, groupId: groupId, speed: currentEnemySpeed,
-            hp: 10, maxHp: 10, hitEffect: 0
-        });
-    }
-
-    function update() {
-        frameCount++;
-
-        stars.forEach(star => {
-            star.y += star.speed;
-            if(star.y > canvas.height) {
-                star.y = 0; star.x = Math.random() * canvas.width;
-            }
-        });
-
-        for (let i = particles.length - 1; i >= 0; i--) {
-            let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.03;
-            if (p.life <= 0) particles.splice(i, 1);
-        }
-
-        for (let i = floatingTexts.length - 1; i >= 0; i--) {
-            let ft = floatingTexts[i]; ft.y += ft.vy; ft.life -= 0.015;
-            if (ft.life <= 0) floatingTexts.splice(i, 1);
-        }
-
-        if (gameState !== 'PLAYING') return;
-
-        const now = Date.now();
-        const elapsedGame = Math.floor((now - gameStartTime) / 1000);
-        const gameTimeLeft = Math.max(0, GAME_DURATION - elapsedGame);
-        
-        ui.hudScore.innerText = score;
-        let title = vocabGroups[currentTargetGroupId].title;
-        ui.hudTarget.innerText = title.length > 8 ? title.substring(0,7)+'...' : title;
-        ui.hudTimer.innerText = gameTimeLeft;
-        ui.hudTimer.style.color = gameTimeLeft <= 10 ? '#ff003c' : '#fff';
-        
-        const switchTimeLeft = Math.max(0, Math.ceil((SWITCH_INTERVAL - (now - lastSwitchTime)) / 1000));
-        ui.hudSwitch.innerText = `隨機換組 countdown: ${switchTimeLeft}s`;
-
-        if (gameTimeLeft === 0) { gameOver(); return; }
-
-        if (now - lastSwitchTime > SWITCH_INTERVAL) {
-            let nextGroup;
-            do { nextGroup = Math.floor(Math.random() * vocabGroups.length); } while (nextGroup === currentTargetGroupId);
-            currentTargetGroupId = nextGroup;
-            lastSwitchTime = now;
-            createFloatingText(canvas.width/2, canvas.height/3, '🚨 目標切換：' + vocabGroups[currentTargetGroupId].title, '#ffde00', 20);
-            spawnRate = Math.max(35, spawnRate - 8);
-        }
-
-        if (frameCount - player.lastShot > player.fireRate) {
-            bullets.push({ x: player.x - 12, y: player.y - 20, width: 4, height: 25, speed: 20 });
-            bullets.push({ x: player.x + 12, y: player.y - 20, width: 4, height: 25, speed: 20 });
-            player.lastShot = frameCount;
-        }
-
-        for (let i = bullets.length - 1; i >= 0; i--) {
-            bullets[i].y -= bullets[i].speed;
-            if (bullets[i].y < -20) bullets.splice(i, 1);
-        }
-
-        if (frameCount % Math.max(10, Math.floor(spawnRate)) === 0) spawnEnemy();
-
-        for (let i = enemies.length - 1; i >= 0; i--) {
-            let enemy = enemies[i];
-            enemy.y += enemy.speed;
-            if (enemy.hitEffect > 0) enemy.hitEffect--;
-            
-            if (enemy.y > canvas.height + enemy.height) { 
-                enemies.splice(i, 1); 
-                continue; 
-            }
-
-            for (let j = bullets.length - 1; j >= 0; j--) {
-                let bullet = bullets[j];
-                if (bullet.x > enemy.x - enemy.width/2 && bullet.x < enemy.x + enemy.width/2 &&
-                    bullet.y > enemy.y - enemy.height/2 && bullet.y < enemy.y + enemy.height/2) {
-                    
-                    enemy.hp--;
-                    bullets.splice(j, 1);
-                    
-                    if (enemy.hp > 0) {
-                        enemy.hitEffect = 4;
-                        createExplosion(bullet.x, enemy.y + enemy.height/2, '#00f3ff', false);
-                    } else {
-                        let isCorrect = (enemy.groupId === currentTargetGroupId);
-                        if (isCorrect) {
-                            score += 10;
-                            createExplosion(enemy.x, enemy.y, '#00f3ff', true);
-                            createFloatingText(enemy.x, enemy.y, 'CORRECT +10', '#00f3ff', 20);
-                        } else {
-                            score -= 10;
-                            createExplosion(enemy.x, enemy.y, '#ff003c', true);
-                            createFloatingText(enemy.x, enemy.y, 'WRONG -10', '#ff003c', 20);
-                        }
-                        enemies.splice(i, 1);
+            uids.forEach(uid => roundPoints[uid] = 0);
+    
+            for (let i = 0; i < uids.length; i++) {
+                for (let j = i + 1; j < uids.length; j++) {
+                    const p1 = uids[i];
+                    const p2 = uids[j];
+                    const c1 = choicesMap[p1]?.[p2] || 'C';
+                    const c2 = choicesMap[p2]?.[p1] || 'C';
+                    const pairKey = [p1, p2].sort().join('_');
+    
+                    let coopStreak = nextCoopStreaks[pairKey] || 0;
+                    let attackStreak = nextAttackStreaks[pairKey] || 0;
+    
+                    let p1Delta = 0, p2Delta = 0;
+                    let streakTriggered = false;
+                    let extraAttackPenalty = 0;
+    
+                    if (c1 === 'C' && c2 === 'C') {
+                        coopStreak += 1;
+                        nextCoopStreaks[pairKey] = coopStreak;
+                        let payout = 20;
+                        if (coopStreak === 2) payout = 30;
+                        if (coopStreak >= 3) payout = 40;
+                        p1Delta = payout;
+                        p2Delta = payout;
+                        streakTriggered = coopStreak > 1;
+                        nextAttackStreaks[pairKey] = 0;
+                    } 
+                    else if (c1 === 'A' && c2 === 'A') {
+                        let basePenalty = -20;
+                        let extra = 0;
+                        if (attackStreak === 1) extra = -30;      // 連續第二輪
+                        else if (attackStreak >= 2) extra = -40;  // 第三輪及以後
+                        p1Delta = basePenalty + extra;
+                        p2Delta = basePenalty + extra;
+                        extraAttackPenalty = extra;
+                        nextAttackStreaks[pairKey] = attackStreak + 1;
+                        nextCoopStreaks[pairKey] = 0;
+                    } 
+                    else if (c1 === 'C' && c2 === 'A') {
+                        p1Delta = 0;
+                        p2Delta = 20;
+                        nextCoopStreaks[pairKey] = 0;
+                        nextAttackStreaks[pairKey] = 0;
+                    } 
+                    else if (c1 === 'A' && c2 === 'C') {
+                        p1Delta = 20;
+                        p2Delta = 0;
+                        nextCoopStreaks[pairKey] = 0;
+                        nextAttackStreaks[pairKey] = 0;
                     }
-                    break;
+    
+                    roundPoints[p1] += p1Delta;
+                    roundPoints[p2] += p2Delta;
+    
+                    logs.push({ 
+                        p1, p2, c1, c2, p1Delta, p2Delta, 
+                        coopStreak: nextCoopStreaks[pairKey],
+                        streakTriggered,
+                        extraAttackPenalty,
+                        isAttackStreak: (c1 === 'A' && c2 === 'A' && extraAttackPenalty !== 0)
+                    });
                 }
             }
+    
+            let updatedPlayers = JSON.parse(JSON.stringify(playersMap));
+            uids.forEach(uid => {
+                updatedPlayers[uid].score += roundPoints[uid];
+            });
+    
+            return { updatedPlayers, logs, nextCoopStreaks, nextAttackStreaks };
         }
-    }
-
-    function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        stars.forEach(star => {
-            ctx.fillStyle = star.color;
-            ctx.globalAlpha = star.size / 2;
-            ctx.beginPath();
-            ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
-            ctx.fill();
-        });
-        ctx.globalAlpha = 1.0;
-
-        if (gameState !== 'PLAYING') return;
-
-        bullets.forEach(bullet => {
-            ctx.fillStyle = '#00f3ff';
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = '#00f3ff';
-            ctx.fillRect(bullet.x - bullet.width/2, bullet.y, bullet.width, bullet.height);
-            ctx.shadowBlur = 0;
-        });
-
-        enemies.forEach(enemy => {
-            ctx.save();
-            ctx.translate(enemy.x, enemy.y);
-            const isHit = enemy.hitEffect > 0;
-            
-            ctx.shadowBlur = isHit ? 20 : 10;
-            ctx.shadowColor = isHit ? '#fff' : '#ff003c';
-            
-            ctx.fillStyle = isHit ? '#ffffff' : 'rgba(15, 6, 12, 0.95)';
-            ctx.strokeStyle = isHit ? '#fff' : '#ff003c';
-            ctx.lineWidth = 2;
-            
-            ctx.beginPath();
-            ctx.moveTo(-enemy.width/2 + 10, -enemy.height/2);
-            ctx.lineTo(enemy.width/2 - 10, -enemy.height/2);
-            ctx.lineTo(enemy.width/2, -enemy.height/2 + 10);
-            ctx.lineTo(enemy.width/2, enemy.height/2 - 10);
-            ctx.lineTo(enemy.width/2 - 10, enemy.height/2);
-            ctx.lineTo(-enemy.width/2 + 10, enemy.height/2);
-            ctx.lineTo(-enemy.width/2, enemy.height/2 - 10);
-            ctx.lineTo(-enemy.width/2, -enemy.height/2 + 10);
-            ctx.closePath();
-            ctx.fill();
-            ctx.stroke();
-            
-            ctx.shadowBlur = 0;
-
-            ctx.fillStyle = isHit ? '#000' : '#00f3ff';
-            ctx.font = 'bold 15px "Noto Sans TC", sans-serif';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(enemy.text, 0, -4);
-
-            const barWidth = enemy.width - 20;
-            const barHeight = 5;
-            const barY = enemy.height/2 - 10;
-            
-            ctx.fillStyle = 'rgba(0,0,0,0.8)';
-            ctx.fillRect(-barWidth/2, barY, barWidth, barHeight);
-            
-            const hpRatio = Math.max(0, enemy.hp / enemy.maxHp);
-            ctx.fillStyle = hpRatio > 0.6 ? '#00f3ff' : (hpRatio > 0.3 ? '#ffde00' : '#ff003c');
-            if (enemy.hp > 0) {
-                ctx.shadowBlur = 5;
-                ctx.shadowColor = ctx.fillStyle;
-                ctx.fillRect(-barWidth/2, barY, barWidth * hpRatio, barHeight);
-                ctx.shadowBlur = 0;
+    
+        // ==========================================
+        // 本地模式 AI 演算 (三人)
+        // ==========================================
+        function runStrategicAI(round, state) {
+            const aiChoices = { 'p2': {}, 'p3': {} };
+            const logs = state.lastLogs;
+            let lastChoiceMap = { 'p1': {}, 'p2': {}, 'p3': {} };
+            if (round > 1 && logs) {
+                logs.forEach(l => {
+                    lastChoiceMap[l.p1][l.p2] = l.c1;
+                    lastChoiceMap[l.p2][l.p1] = l.c2;
+                });
             }
-            
-            ctx.fillStyle = '#050a1f';
-            for(let k = 1; k < enemy.maxHp; k++) {
-                ctx.fillRect(-barWidth/2 + (barWidth / enemy.maxHp) * k - 0.5, barY, 1, barHeight);
-            }
-
-            ctx.restore();
-        });
-
-        ctx.save();
-        ctx.translate(player.x, player.y);
-        
-        ctx.fillStyle = 'rgba(0, 243, 255, 0.05)';
-        ctx.beginPath(); ctx.arc(0, 0, 36, 0, Math.PI*2); ctx.fill();
-        ctx.strokeStyle = 'rgba(0, 243, 255, 0.35)';
-        ctx.lineWidth = 1; ctx.stroke();
-        
-        ctx.beginPath();
-        ctx.arc(0, 0, 28, (frameCount*0.1)%Math.PI*2, (frameCount*0.1)%Math.PI*2 + Math.PI);
-        ctx.strokeStyle = 'rgba(0, 243, 255, 0.55)';
-        ctx.stroke();
-
-        if (frameCount % 2 === 0) {
-            ctx.fillStyle = '#00f3ff';
-            ctx.shadowBlur = 15; ctx.shadowColor = '#00f3ff';
-            ctx.beginPath();
-            ctx.moveTo(-8, player.height/2 - 5);
-            ctx.lineTo(8, player.height/2 - 5);
-            ctx.lineTo(0, player.height/2 + 20 + Math.random()*10);
-            ctx.closePath();
-            ctx.fill();
-            ctx.shadowBlur = 0;
+            const totalRounds = state.maxRounds;
+            const endgameFactor = (round - 1) / (totalRounds - 1);
+            ['p2', 'p3'].forEach(aiId => {
+                const mind = state.aiMinds[aiId];
+                const otherPlayers = ['p1', 'p2', 'p3'].filter(id => id !== aiId);
+                otherPlayers.forEach(opponentId => {
+                    const oldTrust = mind.trustScores[opponentId] || 0.8;
+                    const lastAction = lastChoiceMap[opponentId]?.[aiId] || 'C';
+                    const actualValue = lastAction === 'C' ? 1.0 : 0.0;
+                    const alpha = 0.4;
+                    let currentTrust = (alpha * actualValue) + ((1.0 - alpha) * oldTrust);
+                    mind.trustScores[opponentId] = currentTrust;
+                    const myScore = state.players[aiId].score;
+                    const oppScore = state.players[opponentId].score;
+                    let curbLeaderImpact = 0.0;
+                    if (oppScore - myScore > 30) curbLeaderImpact = Math.min(0.3, (oppScore - myScore - 30) * 0.005);
+                    let pCooperate = currentTrust * (1.0 - endgameFactor * 0.45) - curbLeaderImpact;
+                    pCooperate = Math.max(0.0, Math.min(1.0, pCooperate));
+                    const decision = Math.random() < pCooperate ? 'C' : 'A';
+                    aiChoices[aiId][opponentId] = decision;
+                    if (opponentId === 'p1') {
+                        let reason = '';
+                        if (endgameFactor > 0.8) reason = `賽局接近極限 (折現率 ${(endgameFactor*100).toFixed(0)}%)，逆向歸納防範機制優先。`;
+                        else if (curbLeaderImpact > 0.1) reason = `玩家領先優勢 (優勢抑制權重 ${(curbLeaderImpact*100).toFixed(0)}%)，實施遏制。`;
+                        else if (currentTrust > 0.7) reason = `信任結構健全 (信任率 ${(currentTrust*100).toFixed(0)}%)，傾向追求連擊最大收益。`;
+                        else reason = `歷史信任赤字 (信任率 ${(currentTrust*100).toFixed(0)}%)，採取保險防御策略。`;
+                        mind.lastDecisionReason = reason;
+                        mind.lastMetrics = { trust: currentTrust, discount: endgameFactor, coopProb: pCooperate };
+                    }
+                });
+            });
+            return aiChoices;
         }
-
-        ctx.fillStyle = '#1e1b4b';
-        ctx.strokeStyle = '#00f3ff';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(0, -player.height/2 + 5);
-        ctx.lineTo(player.width/2, player.height/2);
-        ctx.lineTo(-player.width/2, player.height/2);
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
         
-        ctx.fillStyle = '#4c1d95';
-        ctx.beginPath();
-        ctx.moveTo(0, -player.height/2);
-        ctx.lineTo(6, player.height/2);
-        ctx.lineTo(-6, player.height/2);
-        ctx.closePath();
-        ctx.fill(); ctx.stroke();
+        // 本地模式啟動
+        window.startLocalMode = function() {
+            currentMode = 'local';
+            myId = 'p1';
+            localState = {
+                round: 1,
+                maxRounds: 10,
+                players: {
+                    'p1': { name: '玩家 (你)', score: 0 },
+                    'p2': { name: 'Agent Alpha (演算子 α)', score: 0 },
+                    'p3': { name: 'Agent Beta (演算子 β)', score: 0 }
+                },
+                coopStreaks: {},
+                attackStreaks: {},
+                lastLogs: [],
+                aiMinds: {
+                    'p2': { trustScores: { 'p1': 0.8, 'p3': 0.8 }, lastDecisionReason: '系統初始化，評估初始賽局預期。', lastMetrics: { trust: 0.8, discount: 0.0, coopProb: 0.8 } },
+                    'p3': { trustScores: { 'p1': 0.8, 'p2': 0.8 }, lastDecisionReason: '系統初始化，評估初始賽局預期。', lastMetrics: { trust: 0.8, discount: 0.0, coopProb: 0.8 } }
+                }
+            };
+            document.getElementById('local-ai-minds').classList.remove('hidden');
+            prepareGameUI(localState.players, localState.round, localState.coopStreaks, localState.attackStreaks);
+        };
         
-        ctx.fillStyle = '#ff003c';
-        ctx.shadowBlur = 5; ctx.shadowColor = '#ff003c';
-        ctx.beginPath();
-        ctx.ellipse(0, -player.height/4 + 5, 4, 8, 0, 0, Math.PI*2);
-        ctx.fill();
-        ctx.shadowBlur = 0;
+        // 輔助 UI 建立函數 (共用)
+        function prepareGameUI(players, round, coopStreaks, attackStreaks) {
+            myChoices = {};
+            document.getElementById('ui-round').innerText = round;
+            document.getElementById('ui-my-score').innerText = players[myId]?.score || 0;
+            document.getElementById('ui-waiting-others').classList.add('hidden');
+            const lockBtn = document.getElementById('btn-lock-choice');
+            lockBtn.disabled = true;
+            lockBtn.innerText = "決策矩陣未完成";
+            lockBtn.className = "w-full py-4 bg-gray-900 text-gray-600 rounded-2xl font-bold border border-gray-800 cursor-not-allowed";
+            const container = document.getElementById('ui-choice-cards');
+            container.innerHTML = '';
+            Object.entries(players).forEach(([uid, p]) => {
+                if (uid === myId) return;
+                const streakKey = [myId, uid].sort().join('_');
+                const coopCnt = coopStreaks[streakKey] || 0;
+                let streakBadge = '';
+                if (coopCnt > 0) {
+                    let levelColor = coopCnt >= 3 ? 'from-amber-500 to-yellow-450 text-gray-950' : 'from-emerald-500 to-teal-400 text-white';
+                    streakBadge = `<div class="inline-flex items-center gap-1 bg-gradient-to-r ${levelColor} text-xxs px-2 py-0.5 rounded-full font-mono"><i class="fas fa-fire"></i> 連擊 Lv.${coopCnt}</div>`;
+                }
+                const card = document.createElement('div');
+                card.className = "bg-gray-900 p-5 rounded-2xl border border-gray-800 shadow-xl";
+                card.innerHTML = `
+                    <div class="flex justify-between items-start mb-4">
+                        <div><span class="text-base font-bold">對決：<span class="text-indigo-300">${p.name}</span></span><div class="mt-1">${streakBadge}</div></div>
+                        <span class="text-xs bg-gray-950 px-2.5 py-1 rounded-lg text-gray-400 font-mono">SCORE: ${p.score}</span>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="selectChoice('${uid}', 'C', this)" class="flex-1 py-3.5 rounded-xl border border-gray-850 bg-gray-850 text-gray-300 font-extrabold hover:bg-gray-800 transition c-btn"><i class="fas fa-handshake mr-1.5 text-emerald-500"></i>合作 (C)</button>
+                        <button onclick="selectChoice('${uid}', 'A', this)" class="flex-1 py-3.5 rounded-xl border border-gray-850 bg-gray-850 text-gray-300 font-extrabold hover:bg-gray-800 transition a-btn"><i class="fas fa-crosshairs mr-1.5 text-red-500"></i>攻擊 (A)</button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            showScreen('screen-game');
+        }
         
-        ctx.restore();
-
-        particles.forEach(p => {
-            ctx.fillStyle = p.color; ctx.globalAlpha = p.life;
-            ctx.shadowBlur = 5; ctx.shadowColor = p.color;
-            ctx.fillRect(p.x, p.y, p.size, p.size);
-            ctx.shadowBlur = 0;
-        });
-        ctx.globalAlpha = 1.0;
-
-        floatingTexts.forEach(ft => {
-            ctx.fillStyle = ft.color; ctx.globalAlpha = ft.life;
-            ctx.font = `900 ${ft.fontSize}px "Orbitron", "Noto Sans TC", sans-serif`;
-            ctx.textAlign = 'center';
-            ctx.shadowBlur = 10; ctx.shadowColor = ft.color;
-            ctx.fillText(ft.text, ft.x, ft.y);
-            ctx.shadowBlur = 0;
-        });
-        ctx.globalAlpha = 1.0;
-    }
-
-    function gameLoop() {
-        update();
-        draw();
-        animationId = requestAnimationFrame(gameLoop);
-    }
-
-    gameLoop();
-</script>
+        window.selectChoice = function(targetId, choiceType, btn) {
+            myChoices[targetId] = choiceType;
+            const parent = btn.parentElement;
+            parent.querySelectorAll('button').forEach(b => b.classList.remove('btn-active-c', 'btn-active-a'));
+            btn.classList.add(choiceType === 'C' ? 'btn-active-c' : 'btn-active-a');
+            const oppCount = currentMode === 'local' ? 2 : Object.keys(onlineState?.players || {}).length - 1;
+            if (Object.keys(myChoices).length === oppCount) {
+                const lockBtn = document.getElementById('btn-lock-choice');
+                lockBtn.disabled = false;
+                lockBtn.className = "w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black shadow-lg uppercase";
+                lockBtn.innerText = "呈交並鎖定戰略";
+            }
+        };
+        
+        window.submitChoice = async function() {
+            if (isSubmitting) return;
+            isSubmitting = true;
+            document.getElementById('btn-lock-choice').classList.add('hidden');
+            document.getElementById('ui-waiting-others').classList.remove('hidden');
+            if (currentMode === 'local') {
+                setTimeout(() => {
+                    const aiChoices = runStrategicAI(localState.round, localState);
+                    let allChoices = { 'p1': myChoices, ...aiChoices };
+                    const { updatedPlayers, logs, nextCoopStreaks, nextAttackStreaks } = calculateRound(localState.players, allChoices, localState.coopStreaks, localState.attackStreaks);
+                    localState.players = updatedPlayers;
+                    localState.lastLogs = logs;
+                    localState.coopStreaks = nextCoopStreaks;
+                    localState.attackStreaks = nextAttackStreaks;
+                    showRoundResult(localState.players, localState.lastLogs, localState.round);
+                    isSubmitting = false;
+                }, 200);
+            } else if (currentMode === 'online' && currentRoomId && db) {
+                try { await updateDoc(doc(db, 'gameRooms', currentRoomId), { [`currentChoices.${myId}`]: myChoices }); } 
+                catch(e) { showModal('網絡錯誤', '送出選擇失敗，請檢查連線'); }
+                isSubmitting = false;
+            } else { isSubmitting = false; }
+        };
+        
+        function showRoundResult(players, logs, round) {
+            document.getElementById('res-ui-round').innerText = round;
+            if (currentMode === 'local' && localState) {
+                document.getElementById('local-ai-minds').classList.remove('hidden');
+                const psychContainer = document.getElementById('ai-psychology-container');
+                psychContainer.innerHTML = '';
+                Object.entries(localState.aiMinds).forEach(([aiId, mind]) => {
+                    const name = players[aiId]?.name || aiId;
+                    const trust = (mind.lastMetrics.trust*100).toFixed(1);
+                    psychContainer.innerHTML += `<div class="bg-gray-950 p-4 rounded-xl border border-gray-850"><div class="font-bold text-indigo-400">${name}</div><p class="text-gray-300 text-xs my-1">${mind.lastDecisionReason}</p><div class="text-xxs text-gray-400">信任權重: ${trust}% | 合作機率: ${(mind.lastMetrics.coopProb*100).toFixed(0)}%</div></div>`;
+                });
+            } else document.getElementById('local-ai-minds').classList.add('hidden');
+            const sorted = Object.keys(players).sort((a,b)=>players[b].score-players[a].score);
+            const lb = document.getElementById('res-ui-leaderboard');
+            lb.innerHTML = sorted.map((uid,idx)=>`<div class="flex justify-between p-3 rounded-xl ${uid===myId?'bg-indigo-950/40 border-indigo-800':'bg-gray-950/50'}"><span>${idx===0?'🏆':`#${idx+1}`} ${players[uid].name}</span><span class="font-mono font-bold">${players[uid].score}</span></div>`).join('');
+            const logContainer = document.getElementById('res-ui-logs');
+            logContainer.innerHTML = logs.map(log=>{
+                const n1=players[log.p1]?.name||log.p1, n2=players[log.p2]?.name||log.p2;
+                let extraMsg = '';
+                if (log.isAttackStreak) extraMsg = `<div class="text-xxs text-red-300 mt-1"><i class="fas fa-bomb"></i> 攻擊連減懲罰 ${log.extraAttackPenalty} 點！</div>`;
+                else if (log.streakTriggered) extraMsg = `<div class="text-xxs text-amber-300 mt-1"><i class="fas fa-fire"></i> 合作連擊爆發！</div>`;
+                return `<div class="bg-gray-950/40 p-3 rounded-xl border-l-4 border-indigo-500"><div class="flex justify-between text-xs"><span>${n1}</span><span>VS</span><span>${n2}</span></div><div class="flex justify-between mt-1"><span>${log.c1==='C'?'🤝合作':'⚔️攻擊'}</span><span>${log.p1Delta>0?`+${log.p1Delta}`:log.p1Delta}</span><span>${log.c2==='C'?'🤝合作':'⚔️攻擊'}</span><span>${log.p2Delta>0?`+${log.p2Delta}`:log.p2Delta}</span></div>${extraMsg}</div>`;
+            }).join('');
+            document.getElementById('btn-next-round').disabled = false;
+            showScreen('screen-round-result');
+        }
+        
+        window.readyForNextRound = async function() {
+            const btn = document.getElementById('btn-next-round');
+            btn.disabled = true;
+            btn.innerText = "配置中...";
+            if (currentMode === 'local') {
+                if (localState.round >= 10) showFinalResult(localState.players);
+                else { localState.round++; prepareGameUI(localState.players, localState.round, localState.coopStreaks, localState.attackStreaks); }
+            } else if (currentMode === 'online' && currentRoomId && db) {
+                await updateDoc(doc(db, 'gameRooms', currentRoomId), { [`players.${myId}.ready`]: true });
+            }
+        };
+        
+        function showFinalResult(players) {
+            const sorted = Object.keys(players).sort((a,b)=>players[b].score-players[a].score);
+            document.getElementById('final-leaderboard').innerHTML = sorted.map((uid,i)=>`<div class="flex justify-between p-4 rounded-xl border ${i===0?'border-amber-600 bg-amber-950/30':''}"><span>${i===0?'🏆冠軍':'#'+(i+1)} ${players[uid].name}</span><span class="font-mono">${players[uid].score} PT</span></div>`).join('');
+            showScreen('screen-final');
+        }
+        
+        // 線上模式輔助函數 (僅當 firebase 啟用時才會被調用，此處簡單佔位)
+        window.createRoom = async function() { if(!isOnlineEnabled||!currentUser) return showModal('無法創建','線上模式未啟用或尚未驗證'); /* 完整實作已在上方 module 但需掛載全域，因篇幅保留核心，實際用戶會看到繼承邏輯——但此演示提供完整本地模式，線上需配置 Firebase */ showModal('提示','需配置 Firebase 才能使用線上模式，請使用本地模式。'); };
+        window.joinRoom = async function() { showModal('提示','線上模式需要 Firebase 配置，請使用本地模式。'); };
+        window.startOnlineGame = function() {};
+        window.leaveRoom = function() { if(unsubscribeRoom) unsubscribeRoom(); showScreen('screen-menu'); };
+        
+        // 非同步初始化認證
+        if (isOnlineEnabled && auth) {
+            onAuthStateChanged(auth, (user) => {
+                if (user) { currentUser = user; myId = user.uid; if(document.getElementById('screen-loading').classList.contains('hidden-screen')===false) showScreen('screen-menu'); }
+                else { signInAnonymously(auth).catch(e=>console.warn); }
+            });
+            signInAnonymously(auth).catch(e=>console.warn);
+            setTimeout(()=>{ if(!currentUser) showModal('連線狀態','Firebase 連線中，若持續失敗請使用本地模式'); }, 1500);
+        } else {
+            setTimeout(() => { showScreen('screen-menu'); }, 500);
+        }
+    </script>
 </body>
 </html>
