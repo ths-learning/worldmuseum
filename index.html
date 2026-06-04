@@ -1,655 +1,1012 @@
 <!DOCTYPE html>
-<html lang="zh-HK">
+<html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>虛擬世界名勝博物館</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Noto+Serif+TC:wght@400;700&display=swap" rel="stylesheet">
-    
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CYBER-VOCAB: 專業詞彙射擊</title>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
     <style>
         :root {
-            --museum-dark: #0a0a0f;
-            --museum-wall: #15151c;
-            --museum-gold: #d4af37;
+            --cyan: #00f3ff;
+            --pink: #ff003c;
+            --purple: #b026ff;
+            --dark: #050510;
+            --panel-bg: rgba(5, 8, 24, 0.9);
+            --border-glow: 0 0 10px rgba(0, 243, 255, 0.5);
         }
-        body {
-            font-family: 'Noto Serif TC', serif;
-            background-color: var(--museum-dark);
-            color: #e5e7eb;
-        }
-        .font-playfair { font-family: 'Playfair Display', serif; }
-        
-        /* 隱藏滾動條以增加沉浸感，但保留滾動功能 */
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: var(--museum-dark); }
-        ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
 
-        /* --- 狀態 1: 地圖大廳樣式與動畫 --- */
-        #lobby {
-            background: radial-gradient(circle at center, #2a2a35 0%, var(--museum-dark) 100%);
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--dark);
+            overflow: hidden;
+            font-family: 'Noto Sans TC', sans-serif;
+            touch-action: none;
+            color: white;
         }
-        .map-layer {
-            transition: transform 1.5s cubic-bezier(0.65, 0, 0.35, 1), opacity 1.2s ease;
+
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            background: linear-gradient(to bottom, #050a1f, #020205);
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.9);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
-        .zoom-in-active {
-            transform: scale(12);
-            opacity: 0;
-            pointer-events: none;
+
+        canvas {
+            display: block;
+            width: 100%;
+            flex: 1;
+            background-color: transparent;
+            z-index: 1;
         }
-        
-        /* 呼吸燈熱點 (地圖上的光點) */
-        .hotspot {
+
+        .grid-overlay {
             position: absolute;
-            transform: translate(-50%, -50%);
-            width: 16px;
-            height: 16px;
-            background-color: var(--museum-gold);
-            border-radius: 50%;
-            cursor: pointer;
-            box-shadow: 0 0 20px var(--museum-gold);
-            transition: all 0.3s ease;
-            z-index: 10;
+            top: 0; left: 0; right: 0; bottom: 110px;
+            background-image: 
+                linear-gradient(rgba(0, 243, 255, 0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 243, 255, 0.04) 1px, transparent 1px);
+            background-size: 30px 30px;
+            pointer-events: none;
+            z-index: 2;
         }
-        .hotspot::before {
+
+        #hud-bar {
+            height: 110px;
+            background: var(--panel-bg);
+            border-top: 3px solid var(--cyan);
+            box-shadow: 0 -5px 25px rgba(0, 243, 255, 0.25), inset 0 0 15px rgba(0, 243, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            box-sizing: border-box;
+            z-index: 10;
+            position: relative;
+        }
+
+        #hud-bar::before, #hud-bar::after {
             content: '';
             position: absolute;
-            top: 0; left: 0; right: 0; bottom: 0;
-            border-radius: 50%;
-            background-color: var(--museum-gold);
-            animation: pulse-ring 2.5s infinite cubic-bezier(0.215, 0.61, 0.355, 1);
-            z-index: -1;
+            top: -3px;
+            width: 15px;
+            height: 6px;
+            background: white;
+            box-shadow: 0 0 8px white;
         }
-        .hotspot:hover {
-            transform: translate(-50%, -50%) scale(1.4);
-            background-color: #fde047;
+        #hud-bar::before { left: 10%; }
+        #hud-bar::after { right: 10%; }
+
+        .hud-block {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            height: 100%;
         }
-        .hotspot-label {
-            position: absolute;
-            top: 25px;
-            left: 50%;
-            transform: translateX(-50%);
+
+        .hud-left {
+            flex: 1.2;
+            max-width: 50%;
+        }
+
+        .hud-center {
+            flex: 0.8;
+            align-items: center;
+            border-left: 1px dashed rgba(0, 243, 255, 0.3);
+            border-right: 1px dashed rgba(0, 243, 255, 0.3);
+            margin: 0 5px;
+        }
+
+        .hud-right {
+            flex: 1;
+            align-items: flex-end;
+        }
+
+        .hud-label {
+            color: rgba(0, 243, 255, 0.6);
+            font-size: 11px;
+            letter-spacing: 1px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .target-title {
+            color: #ffde00;
+            font-size: 16px;
+            font-weight: 900;
+            margin: 2px 0;
             white-space: nowrap;
-            color: var(--museum-gold);
-            font-weight: 700;
-            font-size: 0.95rem;
-            opacity: 0.7;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.9);
-            pointer-events: none;
-            transition: all 0.3s ease;
-        }
-        .hotspot:hover .hotspot-label { opacity: 1; text-shadow: 0 0 10px var(--museum-gold); top: 30px; }
-
-        @keyframes pulse-ring {
-            0% { transform: scale(1); opacity: 0.8; }
-            100% { transform: scale(3.5); opacity: 0; }
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-shadow: 0 0 5px rgba(255, 222, 0, 0.3);
         }
 
-        /* --- 狀態 2: 畫廊展區樣式 --- */
-        /* 畫廊展品框樣式 (模擬真實畫框) */
-        .exhibit-frame {
-            background: #222;
-            padding: 14px;
-            box-shadow: 
-                0 15px 35px rgba(0,0,0,0.8),
-                inset 0 0 0 2px #444,
-                inset 0 0 0 12px #1a1a1a;
-            transition: transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.5s ease;
+        #switch-timer {
+            font-size: 11px;
+            color: #aaa;
         }
-        .exhibit-frame:hover {
-            transform: translateY(-10px) scale(1.02);
-            box-shadow: 
-                0 30px 50px rgba(212, 175, 55, 0.15),
-                inset 0 0 0 2px var(--museum-gold),
-                inset 0 0 0 12px #1a1a1a;
+
+        .timer-val {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 34px;
+            color: var(--pink);
+            font-weight: 900;
+            line-height: 1;
+            text-shadow: 0 0 8px rgba(255, 0, 60, 0.5);
+        }
+
+        .score-val {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 28px;
+            color: var(--cyan);
+            font-weight: 900;
+            text-shadow: 0 0 8px rgba(0, 243, 255, 0.5);
+        }
+
+        .agent-id {
+            font-size: 11px;
+            color: rgba(255,255,255,0.5);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 120px;
+        }
+
+        .screen-modal {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(2, 2, 5, 0.88);
+            backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .cyber-panel {
+            background: rgba(8, 12, 28, 0.95);
+            border: 2px solid var(--cyan);
+            box-shadow: 0 0 25px rgba(0, 243, 255, 0.3), inset 0 0 20px rgba(0, 243, 255, 0.15);
+            width: 100%;
+            max-width: 420px;
+            border-radius: 12px;
+            padding: 25px;
+            box-sizing: border-box;
+            position: relative;
         }
         
-        /* 展區投射燈效果 */
-        .spotlight {
-            background: radial-gradient(circle at 50% 0%, rgba(212, 175, 55, 0.05) 0%, transparent 70%);
+        .cyber-panel::before, .cyber-panel::after {
+            content: ''; position: absolute; width: 25px; height: 3px; background: var(--cyan);
         }
+        .cyber-panel::before { top: -2px; left: -2px; }
+        .cyber-panel::after { bottom: -2px; right: -2px; }
+
+        .glitch-title {
+            font-family: 'Orbitron', 'Noto Sans TC', sans-serif;
+            font-size: 30px;
+            font-weight: 900;
+            text-align: center;
+            color: #fff;
+            text-shadow: 2px 2px 0px var(--pink), -2px -2px 0px var(--cyan);
+            margin-top: 0;
+            margin-bottom: 20px;
+            letter-spacing: 2px;
+            line-height: 1.2;
+        }
+
+        .cyber-input {
+            width: 100%;
+            background: rgba(0, 243, 255, 0.05);
+            border: none;
+            border-bottom: 2px solid var(--cyan);
+            color: var(--cyan);
+            font-family: 'Orbitron', 'Noto Sans TC', sans-serif;
+            font-size: 18px;
+            padding: 10px;
+            box-sizing: border-box;
+            outline: none;
+            text-align: center;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+        .cyber-input:focus {
+            background: rgba(0, 243, 255, 0.15);
+            box-shadow: 0 5px 15px rgba(0, 243, 255, 0.2);
+        }
+        .cyber-input::placeholder { color: rgba(0, 243, 255, 0.3); }
+
+        .cyber-btn {
+            display: block;
+            width: 100%;
+            background: transparent;
+            color: var(--cyan);
+            border: 1px solid var(--cyan);
+            font-family: 'Noto Sans TC', sans-serif;
+            font-weight: 900;
+            font-size: 18px;
+            padding: 12px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            position: relative;
+            overflow: hidden;
+            transition: 0.2s;
+            border-radius: 4px;
+        }
+        .cyber-btn:hover, .cyber-btn:active {
+            background: var(--cyan);
+            color: var(--dark);
+            box-shadow: 0 0 15px var(--cyan);
+        }
+        .cyber-btn.primary {
+            background: rgba(0, 243, 255, 0.1);
+            border: 2px solid var(--cyan);
+            box-shadow: inset 0 0 10px rgba(0, 243, 255, 0.3);
+        }
+        .cyber-btn.danger {
+            color: var(--pink); border-color: var(--pink);
+        }
+        .cyber-btn.danger:hover, .cyber-btn.danger:active {
+            background: var(--pink); color: white; box-shadow: 0 0 15px var(--pink);
+        }
+
+        .notes-container {
+            margin-top: 15px;
+            max-height: 180px;
+            overflow-y: auto;
+            border-top: 1px dashed rgba(0, 243, 255, 0.2);
+            padding-top: 15px;
+        }
+        .notes-container::-webkit-scrollbar { width: 4px; }
+        .notes-container::-webkit-scrollbar-thumb { background: var(--cyan); }
         
-        /* 進入展區的瀑布流動畫 */
-        .fade-in-up {
-            animation: fadeInUp 1s forwards cubic-bezier(0.2, 0.8, 0.2, 1);
-            opacity: 0;
-            transform: translateY(30px);
+        .note-item {
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 3px solid var(--purple);
+            margin-bottom: 8px;
+            border-radius: 0 4px 4px 0;
+            overflow: hidden;
         }
-        @keyframes fadeInUp {
-            to { opacity: 1; transform: translateY(0); }
+        .note-summary {
+            padding: 8px 10px;
+            color: #fff;
+            font-weight: bold;
+            font-size: 13px;
+            cursor: pointer;
+            outline: none;
+            user-select: none;
+            background: rgba(0, 243, 255, 0.05);
         }
+        .note-content {
+            padding: 8px 10px;
+            color: rgba(255,255,255,0.7);
+            font-size: 12px;
+            line-height: 1.5;
+            background: rgba(5, 5, 10, 0.5);
+        }
+        .tag {
+            display: inline-block; background: rgba(176, 38, 255, 0.15);
+            border: 1px solid var(--purple); border-radius: 3px;
+            padding: 2px 6px; margin: 2px; font-size: 11px; color: #e0b3ff;
+        }
+
+        .lb-list {
+            list-style: none; padding: 0; margin: 0 0 20px 0;
+            max-height: 250px; overflow-y: auto;
+        }
+        .lb-list::-webkit-scrollbar { width: 4px; }
+        .lb-list::-webkit-scrollbar-thumb { background: var(--cyan); }
+        .lb-item {
+            display: flex; justify-content: space-between;
+            padding: 10px; border-bottom: 1px solid rgba(0,243,255,0.2);
+            font-family: 'Orbitron', 'Noto Sans TC', sans-serif;
+            font-size: 14px;
+        }
+        .lb-item:nth-child(1) { color: #ffde00; font-weight: bold; font-size: 16px;}
+        .lb-item:nth-child(2) { color: #e2e8f0; font-weight: bold; }
+        .lb-item:nth-child(3) { color: #b45309; font-weight: bold; }
+        
+        .loading-text { text-align: center; color: var(--cyan); font-size: 14px; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+        .control-hint {
+            font-size: 13px; color: rgba(255,255,255,0.5); text-align: center;
+            background: rgba(0,0,0,0.5); padding: 8px; border-radius: 5px;
+            margin-bottom: 15px; border-left: 2px solid var(--cyan);
+        }
+
+        .hidden { display: none !important; }
     </style>
 </head>
-<body class="overflow-x-hidden min-h-screen flex flex-col antialiased">
+<body>
 
-    <div id="lobby" class="fixed inset-0 z-50 flex items-center justify-center overflow-hidden">
-        
-        <div id="lobby-ui" class="absolute top-16 left-0 w-full text-center z-20 transition-all duration-700 pointer-events-none">
-            <h1 class="font-playfair text-5xl md:text-7xl text-amber-500 mb-4 drop-shadow-2xl tracking-[0.1em]">WORLD MUSEUM</h1>
-            <h2 class="text-2xl md:text-3xl font-bold text-gray-200 tracking-[0.3em] mb-4">虛擬世界名勝博物館</h2>
-            <p class="text-gray-400 text-sm md:text-base tracking-widest animate-pulse font-light">請點擊地圖上的光芒，穿越進入各洲專屬展區</p>
+<div id="game-container">
+    <div class="grid-overlay"></div>
+    
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="hud-bar" class="hidden">
+        <div class="hud-block hud-left">
+            <span class="hud-label">TARGET SYS</span>
+            <span id="target-title" class="target-title">載入中</span>
+            <span id="switch-timer">切換中...</span>
         </div>
+        <div class="hud-block hud-center">
+            <span class="hud-label">TIME</span>
+            <span id="main-timer" class="timer-val">99</span>
+        </div>
+        <div class="hud-block hud-right">
+            <span class="hud-label">SCORE</span>
+            <span id="score-display" class="score-val">0</span>
+            <span id="hud-agent" class="agent-id">AGENT: ---</span>
+        </div>
+    </div>
 
-        <div id="map-layer" class="map-layer relative w-full max-w-6xl aspect-[2/1] mt-24 mx-4">
-            <img src="https://i.imgur.com/SfAXv6V.png" alt="World Map" class="w-full h-full object-contain opacity-30 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+    <div id="home-screen" class="screen-modal">
+        <div class="cyber-panel">
+            <h1 class="glitch-title">CYBER-VOCAB<br><span style="font-size:16px; color:var(--cyan); text-shadow:none; letter-spacing: 1px;">學科專業詞彙特訓</span></h1>
             
-            <div class="hotspot" style="top: 35%; left: 74%;" onclick="enterZone('亞洲', event)">
-                <span class="hotspot-label">亞洲展區</span>
-            </div>
-            <div class="hotspot" style="top: 22%; left: 53%;" onclick="enterZone('歐洲', event)">
-                <span class="hotspot-label">歐洲展區</span>
-            </div>
-            <div class="hotspot" style="top: 25%; left: 18%;" onclick="enterZone('北美洲', event)">
-                <span class="hotspot-label">北美洲展區</span>
-            </div>
-            <div class="hotspot" style="top: 65%; left: 28%;" onclick="enterZone('南美洲', event)">
-                <span class="hotspot-label">南美洲展區</span>
-            </div>
-            <div class="hotspot" style="top: 48%; left: 53%;" onclick="enterZone('非洲', event)">
-                <span class="hotspot-label">非洲展區</span>
-            </div>
-            <div class="hotspot" style="top: 72%; left: 85%;" onclick="enterZone('大洋洲', event)">
-                <span class="hotspot-label">大洋洲展區</span>
-            </div>
-            <div class="hotspot" style="top: 38%; left: 61%;" onclick="enterZone('中東', event)">
-                <span class="hotspot-label">中東展區</span>
+            <input type="text" id="player-name" class="cyber-input" placeholder="輸入特工代號 (必填)" maxlength="10">
+            
+            <button id="btn-start" class="cyber-btn primary">START MISSION</button>
+            <button id="btn-leaderboard" class="cyber-btn">GLOBAL RANKING</button>
+
+            <div class="notes-container">
+                <div style="font-size:12px; color:var(--cyan); margin-bottom:5px; font-weight: bold;">[ 檔案庫 : 溫習筆記 ]</div>
+                <div id="notes-list"></div>
             </div>
         </div>
     </div>
 
-    <div id="gallery" class="hidden min-h-screen relative spotlight flex-col bg-[var(--museum-wall)]">
-        
-        <header class="sticky top-0 z-40 bg-[var(--museum-dark)]/90 backdrop-blur-md border-b border-gray-800 shadow-2xl">
-            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 flex justify-between items-center">
-                <button onclick="returnToLobby()" class="text-gray-400 hover:text-amber-400 transition flex items-center gap-3 group">
-                    <i class="fa-solid fa-arrow-left-long group-hover:-translate-x-2 transition-transform"></i>
-                    <span class="tracking-[0.2em] text-sm">返回大廳</span>
-                </button>
-                <div class="text-center absolute left-1/2 -translate-x-1/2">
-                    <h2 id="gallery-title" class="text-xl md:text-2xl font-bold text-amber-500 tracking-[0.2em]">亞洲展區</h2>
-                </div>
-                
-                <div class="flex items-center gap-4">
-                    <div id="auth-section" class="flex items-center gap-3">
-                        <button id="login-btn" onclick="loginWithGoogle()" class="bg-amber-500/20 hover:bg-amber-500/40 text-amber-400 border border-amber-500/40 px-4 py-2 rounded-sm text-xs md:text-sm tracking-widest transition flex items-center gap-2">
-                            <i class="fa-brands fa-google"></i> Google 登入
-                        </button>
-                        <div id="user-profile" class="hidden flex items-center gap-2">
-                            <img id="user-avatar" src="" alt="Avatar" class="w-8 h-8 rounded-full border border-amber-500/50">
-                            <span id="user-name" class="text-gray-300 text-xs hidden md:inline max-w-[100px] truncate"></span>
-                            <button onclick="logoutFirebase()" class="text-[10px] text-gray-500 hover:text-red-400 transition underline ml-1">登出</button>
-                        </div>
-                    </div>
-
-                    <button id="curator-toggle-btn" onclick="toggleCuratorMode()" class="hidden bg-amber-600/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 px-5 py-2 rounded-sm text-sm tracking-widest transition flex items-center gap-2">
-                        <i class="fa-solid fa-pen-nib"></i> <span class="hidden sm:inline">進入策展模式</span>
-                    </button>
-                </div>
-            </div>
-            
-            <div class="bg-[#0b0b10] border-b border-gray-800/50">
-                <ul id="zone-tabs" class="flex max-w-7xl mx-auto px-4 min-w-max justify-center gap-2 py-2">
-                    </ul>
-            </div>
-        </header>
-
-        <main class="flex-grow max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full flex flex-col xl:flex-row gap-12 relative">
-            
-            <div class="w-full transition-all duration-500" id="exhibit-area">
-                <div class="flex flex-col items-center mb-16 pb-8 border-b border-gray-800 fade-in-up" style="animation-delay: 0.1s;">
-                    <p class="text-gray-500 tracking-[0.3em] text-xs md:text-sm mb-3">GALLERY OF <span id="gallery-subtitle" class="uppercase">ASIA</span></p>
-                    <p class="text-gray-400 font-light tracking-widest">目前共收錄 <span id="exhibit-count" class="text-amber-500 font-bold text-lg mx-1">0</span> 件文明遺產與創作</p>
-                </div>
-
-                <div id="exhibits-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 pb-24">
-                    </div>
-                
-                <div id="empty-state" class="hidden text-center py-32 bg-[#121218] rounded border border-gray-800 shadow-inner fade-in-up" style="animation-delay: 0.3s;">
-                    <i class="fa-solid fa-landmark-dome text-gray-700 text-6xl mb-6"></i>
-                    <h3 class="text-xl font-medium text-gray-300 tracking-[0.2em] mb-3">此展區尚在籌備中</h3>
-                    <p id="empty-state-desc" class="text-gray-500 tracking-wider text-sm">請先登入 Google 帳號，開啟策展權限。</p>
-                </div>
-            </div>
-
-            <div id="curator-panel" class="hidden w-full xl:w-[400px] shrink-0 xl:sticky xl:top-36 h-fit bg-[#121218] border border-gray-700/50 rounded shadow-2xl p-8 fade-in-up z-30" style="animation-delay: 0.1s;">
-                <div class="flex justify-between items-center mb-8 border-b border-gray-700 pb-4">
-                    <h3 class="text-lg font-bold text-amber-500 tracking-[0.2em]"><i class="fa-solid fa-folder-open mr-2"></i>文物入館登記</h3>
-                    <button onclick="toggleCuratorMode()" class="text-gray-500 hover:text-white transition"><i class="fa-solid fa-xmark text-xl"></i></button>
-                </div>
-                
-                <form id="upload-form" class="space-y-6">
-                    <div>
-                        <label class="block text-xs font-medium text-gray-400 mb-2 tracking-[0.1em]">展品名稱</label>
-                        <input type="text" id="title" required placeholder="如：吳哥窟" 
-                            class="w-full px-4 py-3 bg-[var(--museum-dark)] border border-gray-700 rounded-sm text-gray-200 focus:ring-1 focus:ring-amber-500 focus:border-amber-500 outline-none transition font-light tracking-wide">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-medium text-gray-400 mb-2 tracking-[0.1em]">上載影像</label>
-                        <div class="flex justify-center px-6 pt-6 pb-8 border border-gray-700 border-dashed rounded-sm bg-[var(--museum-dark)] hover:bg-gray-800 transition cursor-pointer group" onclick="document.getElementById('file-upload').click()">
-                            <div class="space-y-2 text-center">
-                                <img id="image-preview" class="mx-auto h-40 object-contain hidden mb-4 rounded shadow-lg border border-gray-700" alt="預覽">
-                                <div id="upload-icon-text">
-                                    <i class="fa-solid fa-camera-retro text-3xl text-gray-600 mb-3 group-hover:text-amber-500 transition"></i>
-                                    <div class="flex text-sm text-gray-400 justify-center tracking-widest">
-                                        <span class="font-medium">點擊選擇圖片檔案</span>
-                                        <input id="file-upload" type="file" class="sr-only" accept="image/*" required>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-medium text-gray-400 mb-2 tracking-[0.1em] flex justify-between items-center">
-                            文物解說與考據
-                            <span class="text-[10px] text-amber-500/80 border border-amber-500/30 px-2 py-0.5 rounded"><i class="fa-solid fa-robot mr-1"></i>GenAI 輔助</span>
-                        </label>
-                        <textarea id="description" rows="5" required placeholder="寫下該名勝的歷史背景、建築特色，或你想傳達的文化意義..." 
-                            class="w-full px-4 py-3 bg-[var(--museum-dark)] border border-gray-700 rounded-sm text-gray-200 focus:ring-1 focus:ring-amber-500 focus:border-amber-500 outline-none transition resize-none font-light leading-relaxed tracking-wide"></textarea>
-                    </div>
-
-                    <button type="submit" id="submit-btn" class="w-full bg-amber-600/90 hover:bg-amber-500 text-white font-bold py-3 px-4 rounded-sm tracking-[0.2em] transition duration-300 shadow-[0_0_15px_rgba(212,175,55,0.2)] mt-4">
-                        正式展出
-                    </button>
-                </form>
-            </div>
-        </main>
+    <div id="leaderboard-screen" class="screen-modal hidden">
+        <div class="cyber-panel">
+            <h1 class="glitch-title" style="font-size:22px;">GLOBAL RANKING</h1>
+            <div id="lb-loading" class="loading-text">連線至資料庫中...</div>
+            <ul id="lb-list" class="lb-list hidden">
+                <!-- 排行榜資料 -->
+            </ul>
+            <button id="btn-lb-back" class="cyber-btn danger">BACK TO MENU</button>
+        </div>
     </div>
 
-    <script>
-        // ==========================================
-        // ⚠️ 核心配置：請在此填入你的 Firebase 專案憑證
-        // ==========================================
-        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyC-Gkh739T9c1n_HNGo_5Ik4gLmlEk7Ao4",
-  authDomain: "worldmuseum-c8358.firebaseapp.com",
-  projectId: "worldmuseum-c8358",
-  storageBucket: "worldmuseum-c8358.firebasestorage.app",
-  messagingSenderId: "457517535059",
-  appId: "1:457517535059:web:e711942fe0f3297f8e9ba6",
-  measurementId: "G-KVQS6K5CB6"
-};
- 
+    <div id="game-over-screen" class="screen-modal hidden">
+        <div class="cyber-panel" style="text-align: center;">
+            <h1 class="glitch-title" style="color:var(--pink); text-shadow: 2px 2px 0px white;">MISSION END</h1>
+            
+            <div style="margin: 20px 0;">
+                <div class="hud-label" style="font-size:14px;">FINAL SCORE</div>
+                <div id="final-score" style="font-size: 50px; font-family: 'Orbitron'; color: var(--cyan); font-weight: 900; text-shadow: 0 0 15px var(--cyan);">0</div>
+            </div>
 
-        // ==========================================
-        // ⚠️ 權限設定：請填入管理員 (Admin) 的 Google Email 或 UID
-        // ==========================================
-        const ADMIN_EMAILS = ["wild816@gmail.com"];
+            <p id="save-status" style="font-size:13px; color:var(--purple); font-weight: bold;">記錄同步中...</p>
 
-        // 初始化 Firebase
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-        const storage = firebase.storage();
-        const provider = new firebase.auth.GoogleAuthProvider();
+            <div class="control-hint" style="text-align:left; margin-top:15px; font-size: 12px; line-height: 1.4;">
+                <b>任務摘要：</b><br>
+                - 需連續命中 <span style="color:var(--cyan); font-weight: bold;">10 發</span> 才能摧毀裝甲敵機。<br>
+                - 戰機具備穿透護盾，相撞 <span style="color:var(--cyan); font-weight: bold;">完全不扣分</span> 且直接穿透。
+            </div>
 
-        // --- 核心資料與狀態 ---
-        const zones = ['亞洲', '南美洲', '北美洲', '中東', '非洲', '歐洲', '大洋洲'];
-        let currentZone = '亞洲';
-        let curatorMode = false;
-        let currentUser = null;
-        let isAdmin = false;
+            <button id="btn-retry" class="cyber-btn primary">RETRY MISSION</button>
+            <button id="btn-home" class="cyber-btn">MAIN MENU</button>
+        </div>
+    </div>
+</div>
 
-        // 全域動態數據庫
-        const museumData = { '亞洲': [], '歐洲': [], '南美洲': [], '北美洲': [], '中東': [], '非洲': [], '大洋洲': [] };
+<script type="module">
+    // 正確導入 Firebase SDK
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // DOM 元素綁定
-        const lobby = document.getElementById('lobby');
-        const gallery = document.getElementById('gallery');
-        const mapLayer = document.getElementById('map-layer');
-        const lobbyUI = document.getElementById('lobby-ui');
-        
-        const zoneTabs = document.getElementById('zone-tabs');
-        const galleryTitle = document.getElementById('gallery-title');
-        const gallerySubtitle = document.getElementById('gallery-subtitle');
-        const exhibitsGrid = document.getElementById('exhibits-grid');
-        const emptyState = document.getElementById('empty-state');
-        const emptyStateDesc = document.getElementById('empty-state-desc');
-        const exhibitCount = document.getElementById('exhibit-count');
-        const curatorPanel = document.getElementById('curator-panel');
-        const curatorToggleBtn = document.getElementById('curator-toggle-btn');
-        
-        const uploadForm = document.getElementById('upload-form');
-        const fileUpload = document.getElementById('file-upload');
-        const imagePreview = document.getElementById('image-preview');
-        const uploadIconText = document.getElementById('upload-icon-text');
-        const submitBtn = document.getElementById('submit-btn');
+    // Firebase 設定
+    const firebaseConfig = {
+        apiKey: "AIzaSyDKVsc9Y0Voo0pvU_7ZN90KdmyvKOBr_O0",
+        authDomain: "conceptshoot-f24d7.firebaseapp.com",
+        projectId: "conceptshoot-f24d7",
+        storageBucket: "conceptshoot-f24d7.firebasestorage.app",
+        messagingSenderId: "607132351767",
+        appId: "1:607132351767:web:873a11288bb8bbed868b52",
+        measurementId: "G-9J3Z5CBYN7"
+    };
 
-        // --- Firebase 身份驗證邏輯 ---
+    // 初始化 Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
 
-        // 監聽使用者登入狀態
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                currentUser = user;
-                // 檢查是否為 Admin
-                isAdmin = ADMIN_EMAILS.includes(user.email);
-                
-                // 更新 UI
-                document.getElementById('login-btn').classList.add('hidden');
-                document.getElementById('user-profile').classList.remove('hidden');
-                document.getElementById('user-avatar').src = user.photoURL || 'https://via.placeholder.com/150';
-                document.getElementById('user-name').innerText = user.displayName || '策展人';
-                curatorToggleBtn.classList.remove('hidden');
-                emptyStateDesc.innerText = "請點擊右上方「策展模式」，佈置此展區。";
-            } else {
-                currentUser = null;
-                isAdmin = false;
-                
-                // 回復未登入 UI
-                document.getElementById('login-btn').classList.remove('hidden');
-                document.getElementById('user-profile').classList.add('hidden');
-                curatorToggleBtn.classList.add('hidden');
-                curatorPanel.classList.add('hidden');
-                curatorMode = false;
-                emptyStateDesc.innerText = "請先登入 Google 帳號，開啟策展權限。";
-            }
-            // 重新渲染畫面
-            renderExhibits();
+    // 匿名登入，確保寫入權限 (符合 Firebase 規則)
+    let currentUser = null;
+    signInAnonymously(auth)
+        .then((userCredential) => {
+            currentUser = userCredential.user;
+            console.log("匿名登入成功，UID:", currentUser.uid);
+        })
+        .catch((error) => {
+            console.error("匿名登入失敗，排行榜與儲存功能將無法使用", error);
         });
 
-        // Google 登入
-        function loginWithGoogle() {
-            auth.signInWithPopup(provider).catch(error => {
-                console.error("登入失敗:", error);
-                alert("登入失敗: " + error.message);
-            });
-        }
+    // ----------------------------------------------------
+    // DOM 綁定
+    // ----------------------------------------------------
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const container = document.getElementById('game-container');
 
-        // 登出
-        function logoutFirebase() {
-            auth.signOut().then(() => {
-                returnToLobby();
-            }).catch(error => {
-                console.error("登出失敗:", error);
-            });
-        }
+    const screens = {
+        home: document.getElementById('home-screen'),
+        hud: document.getElementById('hud-bar'),
+        leaderboard: document.getElementById('leaderboard-screen'),
+        gameover: document.getElementById('game-over-screen')
+    };
 
-        // --- 監聽 Firestore 即時資料庫變動 ---
-        function startListeningToDatabase() {
-            db.collection('exhibits').orderBy('createdAt', 'desc').onSnapshot(snapshot => {
-                // 清空原陣列
-                zones.forEach(z => museumData[z] = []);
-                
-                // 分流裝填資料
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    museumData[data.zone].push({
-                        id: doc.id,
-                        ...data
-                    });
+    const ui = {
+        playerNameInput: document.getElementById('player-name'),
+        btnStart: document.getElementById('btn-start'),
+        btnLb: document.getElementById('btn-leaderboard'),
+        btnLbBack: document.getElementById('btn-lb-back'),
+        btnRetry: document.getElementById('btn-retry'),
+        btnHome: document.getElementById('btn-home'),
+        notesList: document.getElementById('notes-list'),
+        
+        hudScore: document.getElementById('score-display'),
+        hudTarget: document.getElementById('target-title'),
+        hudTimer: document.getElementById('main-timer'),
+        hudSwitch: document.getElementById('switch-timer'),
+        hudAgent: document.getElementById('hud-agent'),
+        
+        lbLoading: document.getElementById('lb-loading'),
+        lbList: document.getElementById('lb-list'),
+        finalScore: document.getElementById('final-score'),
+        saveStatus: document.getElementById('save-status')
+    };
+
+    // ----------------------------------------------------
+    // 專業學科題庫與筆記
+    // ----------------------------------------------------
+    const vocabGroups = [
+        { id: 0, title: "旅遊產品特性", words: ["無形性", "差異性", "互補性", "不可保存性", "帶有風險"] },
+        { id: 1, title: "SMART原則", words: ["明確性", "可衡量性", "一致性", "實際性", "有時限性"] },
+        { id: 2, title: "成功景點的特性", words: ["高品質", "真實性", "獨特性", "吸客能力", "活動選擇及可達度"] },
+        { id: 3, title: "顧客服務的性質", words: ["綜合性", "直接性", "情緒性", "時間性", "應變性"] },
+        { id: 4, title: "優質顧客服務指標", words: ["可靠性", "可信性", "有形性", "關懷性", "反應性"] }
+    ];
+
+    function generateNotes() {
+        ui.notesList.innerHTML = vocabGroups.map(group => `
+            <details class="note-item">
+                <summary class="note-summary">▶ ${group.title}</summary>
+                <div class="note-content">
+                    ${group.words.map(w => `<span class="tag">${w}</span>`).join('')}
+                </div>
+            </details>
+        `).join('');
+    }
+    generateNotes();
+
+    const cachedName = localStorage.getItem('cyberVocabPlayer');
+    if (cachedName) ui.playerNameInput.value = cachedName;
+
+    // ----------------------------------------------------
+    // 遊戲核心邏輯
+    // ----------------------------------------------------
+    let gameState = 'HOME'; // HOME, PLAYING, GAMEOVER
+    let score = 0;
+    let currentTargetGroupId = 0; 
+    let baseSpeed = 0.5; 
+    let spawnRate = 80;  
+    let frameCount = 0;
+    let animationId;
+    
+    let gameStartTime = 0;
+    const GAME_DURATION = 99;
+    let lastSwitchTime = 0;
+    const SWITCH_INTERVAL = 30000;
+
+    let bullets = [];
+    let enemies = [];
+    let particles = [];
+    let floatingTexts = [];
+    let stars = [];
+
+    for(let i=0; i<80; i++){
+        stars.push({
+            x: Math.random() * 600, y: Math.random() * 800,
+            size: Math.random() * 1.5 + 0.5,
+            speed: Math.random() * 3 + 1,
+            color: Math.random() > 0.6 ? '#00f3ff' : '#ffffff'
+        });
+    }
+
+    const HUD_BAR_HEIGHT = 110;
+    const player = {
+        x: 0, 
+        y: 0,
+        width: 48,
+        height: 58,
+        speed: 8,
+        lastShot: 0,
+        fireRate: 8
+    };
+
+    function resizeCanvas() {
+        canvas.width = container.clientWidth;
+        canvas.height = container.clientHeight - HUD_BAR_HEIGHT; 
+        player.y = canvas.height - 40; 
+        if (player.x === 0) player.x = canvas.width / 2;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    // 滑動控制
+    let isDragging = false;
+    let startX = 0, playerStartX = 0;
+
+    function startDrag(e) {
+        if(gameState !== 'PLAYING') return;
+        e.preventDefault(); 
+        isDragging = true;
+        startX = e.touches ? e.touches[0].clientX : e.clientX;
+        playerStartX = player.x;
+    }
+
+    function moveDrag(e) {
+        if (!isDragging || gameState !== 'PLAYING') return;
+        e.preventDefault();
+        const currentX = e.touches ? e.touches[0].clientX : e.clientX;
+        player.x = playerStartX + (currentX - startX);
+        if (player.x < player.width/2) player.x = player.width/2;
+        if (player.x > canvas.width - player.width/2) player.x = canvas.width - player.width/2;
+    }
+
+    function endDrag() { isDragging = false; }
+
+    canvas.addEventListener('touchstart', startDrag, {passive: false});
+    canvas.addEventListener('touchmove', moveDrag, {passive: false});
+    canvas.addEventListener('touchend', endDrag);
+    canvas.addEventListener('mousedown', startDrag);
+    canvas.addEventListener('mousemove', moveDrag);
+    window.addEventListener('mouseup', endDrag);
+
+    // UI 切換
+    function switchScreen(activeScreen) {
+        screens.home.classList.add('hidden');
+        screens.hud.classList.add('hidden');
+        screens.leaderboard.classList.add('hidden');
+        screens.gameover.classList.add('hidden');
+
+        if (activeScreen === 'game') {
+            screens.hud.classList.remove('hidden');
+        } else if (screens[activeScreen]) {
+            screens[activeScreen].classList.remove('hidden');
+        }
+    }
+
+    ui.btnStart.addEventListener('click', () => {
+        const pName = ui.playerNameInput.value.trim();
+        if (!pName) {
+            alert('系統提示：請輸入特工代號才能開始任務！');
+            ui.playerNameInput.focus();
+            return;
+        }
+        localStorage.setItem('cyberVocabPlayer', pName);
+        startMission();
+    });
+
+    ui.btnRetry.addEventListener('click', startMission);
+    ui.btnHome.addEventListener('click', () => {
+        gameState = 'HOME';
+        switchScreen('home');
+    });
+
+    // 讀取排行榜 (使用簡潔的 leaderboard 集合)
+    ui.btnLb.addEventListener('click', async () => {
+        switchScreen('leaderboard');
+        ui.lbLoading.classList.remove('hidden');
+        ui.lbList.classList.add('hidden');
+        ui.lbList.innerHTML = '';
+        
+        try {
+            const leaderboardRef = collection(db, 'leaderboard');
+            const q = query(leaderboardRef, orderBy('score', 'desc'), limit(10));
+            const snapshot = await getDocs(q);
+            let scores = [];
+            snapshot.forEach(doc => scores.push(doc.data()));
+            
+            ui.lbLoading.classList.add('hidden');
+            ui.lbList.classList.remove('hidden');
+            
+            if (scores.length === 0) {
+                ui.lbList.innerHTML = '<li class="lb-item" style="justify-content:center;">目前尚無紀錄</li>';
+            } else {
+                ui.lbList.innerHTML = scores.map((s, i) => `
+                    <li class="lb-item">
+                        <span>#${i+1}</span>
+                        <span style="flex:1; text-align:center;">${s.name}</span>
+                        <span>${s.score} PTS</span>
+                    </li>
+                `).join('');
+            }
+        } catch (e) {
+            ui.lbLoading.innerText = '排行榜讀取失敗：請檢查網路或 Firebase 設定';
+            console.error(e);
+        }
+    });
+
+    ui.btnLbBack.addEventListener('click', () => {
+        switchScreen('home');
+    });
+
+    function startMission() {
+        score = 0;
+        baseSpeed = canvas.height * 0.001; 
+        spawnRate = 80;
+        
+        currentTargetGroupId = Math.floor(Math.random() * vocabGroups.length);
+        const now = Date.now();
+        gameStartTime = now;
+        lastSwitchTime = now;
+        
+        bullets = [];
+        enemies = [];
+        particles = [];
+        floatingTexts = [];
+        frameCount = 0;
+        
+        player.lastShot = 0; 
+        isDragging = false;
+        
+        resizeCanvas();
+
+        const agentName = localStorage.getItem('cyberVocabPlayer') || 'AGENT';
+        ui.hudAgent.innerText = `AGENT: ${agentName}`;
+
+        gameState = 'PLAYING';
+        switchScreen('game');
+    }
+
+    async function gameOver() {
+        gameState = 'GAMEOVER';
+        switchScreen('gameover');
+        
+        ui.finalScore.innerText = score;
+        const pName = ui.playerNameInput.value.trim() || 'Anonymous';
+        
+        // 上傳成績 (僅當已匿名登入成功時)
+        if (db && currentUser) {
+            ui.saveStatus.innerText = '同步成績至雲端中央資料庫...';
+            ui.saveStatus.style.color = '#b026ff';
+            try {
+                const leaderboardRef = collection(db, 'leaderboard');
+                await addDoc(leaderboardRef, {
+                    name: pName,
+                    score: score,
+                    timestamp: Date.now(),
+                    uid: currentUser.uid
                 });
-                
-                // 即時刷新
-                renderExhibits();
-            }, error => {
-                console.error("資料庫讀取出錯: ", error);
+                ui.saveStatus.innerText = '✅ 成績成功上傳雲端！';
+                ui.saveStatus.style.color = '#00f3ff';
+            } catch (e) {
+                console.error("上傳失敗", e);
+                ui.saveStatus.innerText = '⚠️ 同步失敗 (已保存於本地)';
+                ui.saveStatus.style.color = '#ff003c';
+            }
+        } else {
+            ui.saveStatus.innerText = '單機模式 (未連結雲端資料庫)';
+            ui.saveStatus.style.color = '#aaa';
+        }
+    }
+
+    // 特效函數
+    function createExplosion(x, y, color, isMassive = false) {
+        const count = isMassive ? 35 : 15;
+        const force = isMassive ? 14 : 8;
+        for (let i = 0; i < count; i++) {
+            particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * force,
+                vy: (Math.random() - 0.5) * force,
+                life: 1, color: color,
+                size: Math.random() * (isMassive ? 5 : 3) + 2
             });
         }
+    }
 
-        // 啟動即時資料監聽
-        startListeningToDatabase();
+    function createFloatingText(x, y, text, color, fontSize = 24) {
+        floatingTexts.push({
+            x: x, y: y, text: text, color: color, life: 1, vy: -1.5, fontSize: fontSize
+        });
+    }
 
+    function spawnEnemy() {
+        let groupId = Math.random() < 0.5 ? currentTargetGroupId : 
+            [0,1,2,3,4].filter(id => id !== currentTargetGroupId)[Math.floor(Math.random() * 4)];
+        
+        const group = vocabGroups[groupId];
+        const word = group.words[Math.floor(Math.random() * group.words.length)];
+        
+        const width = Math.max(100, (word.length * 16) + 30);
+        const height = 44; 
+        
+        const elapsedGame = Math.max(0, (Date.now() - gameStartTime) / 1000);
+        const timeProgress = Math.min(1, elapsedGame / GAME_DURATION);
+        const currentEnemySpeed = baseSpeed + (timeProgress * baseSpeed * 3.5) + (Math.random() * 0.8);
+        
+        enemies.push({
+            x: Math.random() * (canvas.width - width) + width/2,
+            y: -height, width: width, height: height,
+            text: word, groupId: groupId, speed: currentEnemySpeed,
+            hp: 10, maxHp: 10, hitEffect: 0
+        });
+    }
 
-        // --- 場景切換與動畫邏輯 ---
+    function update() {
+        frameCount++;
 
-        function enterZone(zone, event) {
-            currentZone = zone;
-            const rect = mapLayer.getBoundingClientRect();
-            let originX = 50, originY = 50;
-            if (event) {
-                originX = ((event.clientX - rect.left) / rect.width) * 100;
-                originY = ((event.clientY - rect.top) / rect.height) * 100;
+        stars.forEach(star => {
+            star.y += star.speed;
+            if(star.y > canvas.height) {
+                star.y = 0; star.x = Math.random() * canvas.width;
             }
+        });
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i]; p.x += p.vx; p.y += p.vy; p.life -= 0.03;
+            if (p.life <= 0) particles.splice(i, 1);
+        }
+
+        for (let i = floatingTexts.length - 1; i >= 0; i--) {
+            let ft = floatingTexts[i]; ft.y += ft.vy; ft.life -= 0.015;
+            if (ft.life <= 0) floatingTexts.splice(i, 1);
+        }
+
+        if (gameState !== 'PLAYING') return;
+
+        const now = Date.now();
+        const elapsedGame = Math.floor((now - gameStartTime) / 1000);
+        const gameTimeLeft = Math.max(0, GAME_DURATION - elapsedGame);
+        
+        ui.hudScore.innerText = score;
+        let title = vocabGroups[currentTargetGroupId].title;
+        ui.hudTarget.innerText = title.length > 8 ? title.substring(0,7)+'...' : title;
+        ui.hudTimer.innerText = gameTimeLeft;
+        ui.hudTimer.style.color = gameTimeLeft <= 10 ? '#ff003c' : '#fff';
+        
+        const switchTimeLeft = Math.max(0, Math.ceil((SWITCH_INTERVAL - (now - lastSwitchTime)) / 1000));
+        ui.hudSwitch.innerText = `隨機換組 countdown: ${switchTimeLeft}s`;
+
+        if (gameTimeLeft === 0) { gameOver(); return; }
+
+        if (now - lastSwitchTime > SWITCH_INTERVAL) {
+            let nextGroup;
+            do { nextGroup = Math.floor(Math.random() * vocabGroups.length); } while (nextGroup === currentTargetGroupId);
+            currentTargetGroupId = nextGroup;
+            lastSwitchTime = now;
+            createFloatingText(canvas.width/2, canvas.height/3, '🚨 目標切換：' + vocabGroups[currentTargetGroupId].title, '#ffde00', 20);
+            spawnRate = Math.max(35, spawnRate - 8);
+        }
+
+        if (frameCount - player.lastShot > player.fireRate) {
+            bullets.push({ x: player.x - 12, y: player.y - 20, width: 4, height: 25, speed: 20 });
+            bullets.push({ x: player.x + 12, y: player.y - 20, width: 4, height: 25, speed: 20 });
+            player.lastShot = frameCount;
+        }
+
+        for (let i = bullets.length - 1; i >= 0; i--) {
+            bullets[i].y -= bullets[i].speed;
+            if (bullets[i].y < -20) bullets.splice(i, 1);
+        }
+
+        if (frameCount % Math.max(10, Math.floor(spawnRate)) === 0) spawnEnemy();
+
+        for (let i = enemies.length - 1; i >= 0; i--) {
+            let enemy = enemies[i];
+            enemy.y += enemy.speed;
+            if (enemy.hitEffect > 0) enemy.hitEffect--;
             
-            mapLayer.style.transformOrigin = `${originX}% ${originY}%`;
-            lobbyUI.style.opacity = '0';
-            mapLayer.classList.add('zoom-in-active');
-            
-            setTimeout(() => {
-                lobby.classList.add('hidden');
-                gallery.classList.remove('hidden');
-                gallery.classList.add('flex');
-                
-                curatorMode = false;
-                curatorPanel.classList.add('hidden');
-                
-                initTabs();
-                updateGalleryUI();
-                renderExhibits();
-            }, 1200); 
-        }
-
-        function returnToLobby() {
-            gallery.classList.add('hidden');
-            gallery.classList.remove('flex');
-            lobby.classList.remove('hidden');
-            
-            requestAnimationFrame(() => {
-                mapLayer.classList.remove('zoom-in-active');
-                lobbyUI.style.opacity = '1';
-            });
-        }
-
-        // --- 畫廊 UI 邏輯 ---
-
-        function initTabs() {
-            zoneTabs.innerHTML = '';
-            zones.forEach(zone => {
-                const li = document.createElement('li');
-                const btn = document.createElement('button');
-                btn.innerText = zone;
-                btn.className = `px-4 py-2 text-xs md:text-sm tracking-widest transition-all duration-300 ${
-                    zone === currentZone 
-                    ? 'text-amber-500 border-b-2 border-amber-500 font-bold' 
-                    : 'text-gray-500 hover:text-gray-300 hover:border-b hover:border-gray-600'
-                }`;
-                btn.onclick = () => {
-                    currentZone = zone;
-                    initTabs(); 
-                    updateGalleryUI();
-                    renderExhibits();
-                };
-                li.appendChild(btn);
-                zoneTabs.appendChild(li);
-            });
-        }
-
-        function updateGalleryUI() {
-            galleryTitle.innerText = `${currentZone}展區`;
-            const subMap = {'亞洲':'ASIA', '南美洲':'SOUTH AMERICA', '北美洲':'NORTH AMERICA', '中東':'MIDDLE EAST', '非洲':'AFRICA', '歐洲':'EUROPE', '大洋洲':'OCEANIA'};
-            gallerySubtitle.innerText = subMap[currentZone] || currentZone;
-        }
-
-        function toggleCuratorMode() {
-            if (!currentUser) {
-                alert('請先進行 Google 登入以開啟策展模式。');
-                return;
+            if (enemy.y > canvas.height + enemy.height) { 
+                enemies.splice(i, 1); 
+                continue; 
             }
-            curatorMode = !curatorMode;
-            if (curatorMode) {
-                curatorPanel.classList.remove('hidden');
-            } else {
-                curatorPanel.classList.add('hidden');
-            }
-        }
 
-        function renderExhibits() {
-            exhibitsGrid.innerHTML = '';
-            const exhibits = museumData[currentZone] || [];
-            exhibitCount.innerText = exhibits.length;
-
-            if (exhibits.length === 0) {
-                emptyState.classList.remove('hidden');
-            } else {
-                emptyState.classList.add('hidden');
-                exhibits.forEach((exhibit, index) => {
-                    const card = document.createElement('div');
-                    card.className = `exhibit-frame flex flex-col fade-in-up bg-[#1a1a22] relative`;
-                    card.style.animationDelay = `${0.1 + (index * 0.15)}s`;
+            for (let j = bullets.length - 1; j >= 0; j--) {
+                let bullet = bullets[j];
+                if (bullet.x > enemy.x - enemy.width/2 && bullet.x < enemy.x + enemy.width/2 &&
+                    bullet.y > enemy.y - enemy.height/2 && bullet.y < enemy.y + enemy.height/2) {
                     
-                    let starsHtml = '';
-                    for (let i = 1; i <= 5; i++) {
-                        starsHtml += `<i class="fa-star ${i <= Math.round(exhibit.rating || 5) ? 'fa-solid text-amber-400' : 'fa-regular text-gray-700'} cursor-pointer hover:text-amber-200 transition" onclick="rateExhibit('${exhibit.id}', ${i})"></i>`;
+                    enemy.hp--;
+                    bullets.splice(j, 1);
+                    
+                    if (enemy.hp > 0) {
+                        enemy.hitEffect = 4;
+                        createExplosion(bullet.x, enemy.y + enemy.height/2, '#00f3ff', false);
+                    } else {
+                        let isCorrect = (enemy.groupId === currentTargetGroupId);
+                        if (isCorrect) {
+                            score += 10;
+                            createExplosion(enemy.x, enemy.y, '#00f3ff', true);
+                            createFloatingText(enemy.x, enemy.y, 'CORRECT +10', '#00f3ff', 20);
+                        } else {
+                            score -= 10;
+                            createExplosion(enemy.x, enemy.y, '#ff003c', true);
+                            createFloatingText(enemy.x, enemy.y, 'WRONG -10', '#ff003c', 20);
+                        }
+                        enemies.splice(i, 1);
                     }
-
-                    // 核心修改 2 & 3：權限審查，只有 Admin 或物件擁有者本人才能看見與觸發「刪除」
-                    const canManage = isAdmin || (currentUser && exhibit.uid === currentUser.uid);
-                    const actionButtonHtml = canManage ? `
-                        <div class="absolute top-6 right-6 z-10">
-                            <button onclick="deleteExhibit('${exhibit.id}', '${exhibit.storagePath}')" class="bg-red-950/80 hover:bg-red-600 border border-red-500/50 text-red-200 text-xs px-3 py-1.5 rounded shadow-lg transition flex items-center gap-1">
-                                <i class="fa-solid fa-trash-can"></i> 撤展
-                            </button>
-                        </div>
-                    ` : '';
-
-                    card.innerHTML = `
-                        ${actionButtonHtml}
-                        <div class="relative w-full aspect-[4/3] overflow-hidden bg-black mb-5 outline outline-1 outline-[#333]">
-                            <img src="${exhibit.imgUrl}" alt="${exhibit.title}" class="w-full h-full object-contain transition duration-[2s] hover:scale-105 opacity-80 hover:opacity-100">
-                        </div>
-                        
-                        <div class="p-2 flex-grow flex flex-col border-t border-gray-700/50 pt-5">
-                            <h4 class="text-xl md:text-2xl font-bold text-gray-100 font-playfair tracking-[0.1em] mb-1 text-center">${exhibit.title}</h4>
-                            <p class="text-[10px] text-amber-500/60 tracking-widest text-center mb-4">策展人：${exhibit.creatorName || '系統預載'}</p>
-                            <p class="text-sm text-gray-400 mb-6 flex-grow leading-relaxed font-light tracking-wide text-justify">${exhibit.description}</p>
-                            
-                            <div class="mt-auto flex justify-between items-center bg-[var(--museum-dark)] p-3 rounded border border-gray-800">
-                                <div class="flex items-center space-x-1 text-xs">
-                                    ${starsHtml}
-                                    <span class="ml-2 text-gray-500 font-sans">(${exhibit.votes || 0})</span>
-                                </div>
-                                <button class="text-amber-500 hover:text-amber-300 text-xs tracking-widest border border-amber-600/30 px-3 py-1.5 rounded-sm transition flex items-center gap-2" onclick="alert('館長 AI 啟動中... 這件展品有什麼故事想問我嗎？')">
-                                    <i class="fa-solid fa-headphones-simple"></i> 導覽
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                    exhibitsGrid.appendChild(card);
-                });
-            }
-        }
-
-        // --- 核心修改 4：圖片儲存至 Firebase Storage 與表單上載邏輯 ---
-
-        fileUpload.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                imagePreview.src = URL.createObjectURL(file);
-                imagePreview.classList.remove('hidden');
-                uploadIconText.classList.add('hidden');
-            }
-        });
-
-        uploadForm.addEventListener('submit', function(e) {
-            e.preventDefault();
-            
-            if (!currentUser) {
-                alert("請先登入 Google 帳號！");
-                return;
-            }
-
-            const title = document.getElementById('title').value;
-            const description = document.getElementById('description').value;
-            const file = fileUpload.files[0];
-
-            if (!file) {
-                alert("請選擇要上載的展品影像！");
-                return;
-            }
-
-            // 鎖定按鈕防止重複提交
-            submitBtn.disabled = true;
-            submitBtn.innerText = "文物上傳雲端中...";
-
-            // 1. 定義雲端檔案儲存路徑
-            const fileExtension = file.name.split('.').pop();
-            const storagePath = `museum/${currentZone}/${Date.now()}_${currentUser.uid}.${fileExtension}`;
-            const fileRef = storage.ref().child(storagePath);
-
-            // 2. 上載檔案至 Firebase Storage
-            fileRef.put(file).then(snapshot => {
-                // 获取下載網址
-                return snapshot.ref.getDownloadURL();
-            }).then(downloadURL => {
-                // 3. 寫入資訊至 Firebase Firestore
-                return db.collection('exhibits').add({
-                    title: title,
-                    description: description,
-                    imgUrl: downloadURL,      // 雲端儲存空間網址
-                    storagePath: storagePath,  // 保留路徑方便後續刪除檔案
-                    zone: currentZone,
-                    uid: currentUser.uid,      // 綁定上載者 UID
-                    creatorName: currentUser.displayName || "安全帳號",
-                    rating: 5,
-                    votes: 1,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-            }).then(() => {
-                alert("名勝文物已成功登記並正式展出！");
-                // 重置表單與 UI
-                uploadForm.reset();
-                imagePreview.classList.add('hidden');
-                imagePreview.src = '';
-                uploadIconText.classList.remove('hidden');
-                toggleCuratorMode();
-            }).catch(error => {
-                console.error("上載出錯:", error);
-                alert("上載失敗: " + error.message);
-            }).finally(() => {
-                submitBtn.disabled = false;
-                submitBtn.innerText = "正式展出";
-            });
-        });
-
-        // 刪除文物邏輯
-        function deleteExhibit(docId, storagePath) {
-            if (!confirm("您確定要將此文物移除出館嗎？此操作無法還原。")) return;
-
-            // 1. 先從 Firestore 資料庫中刪除文字紀錄
-            db.collection('exhibits').doc(docId).delete().then(() => {
-                // 2. 如果有雲端儲存路徑，同時將雲端圖片檔案抹除
-                if (storagePath && storagePath !== 'undefined') {
-                    storage.ref().child(storagePath).delete().catch(err => {
-                        console.error("雲端圖片檔案移除失敗或檔案不存在:", err);
-                    });
+                    break;
                 }
-                alert("文物已成功移出展區。");
-            }).catch(error => {
-                alert("移除失敗: " + error.message);
-            });
+            }
+        }
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        stars.forEach(star => {
+            ctx.fillStyle = star.color;
+            ctx.globalAlpha = star.size / 2;
+            ctx.beginPath();
+            ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1.0;
+
+        if (gameState !== 'PLAYING') return;
+
+        bullets.forEach(bullet => {
+            ctx.fillStyle = '#00f3ff';
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#00f3ff';
+            ctx.fillRect(bullet.x - bullet.width/2, bullet.y, bullet.width, bullet.height);
+            ctx.shadowBlur = 0;
+        });
+
+        enemies.forEach(enemy => {
+            ctx.save();
+            ctx.translate(enemy.x, enemy.y);
+            const isHit = enemy.hitEffect > 0;
+            
+            ctx.shadowBlur = isHit ? 20 : 10;
+            ctx.shadowColor = isHit ? '#fff' : '#ff003c';
+            
+            ctx.fillStyle = isHit ? '#ffffff' : 'rgba(15, 6, 12, 0.95)';
+            ctx.strokeStyle = isHit ? '#fff' : '#ff003c';
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            ctx.moveTo(-enemy.width/2 + 10, -enemy.height/2);
+            ctx.lineTo(enemy.width/2 - 10, -enemy.height/2);
+            ctx.lineTo(enemy.width/2, -enemy.height/2 + 10);
+            ctx.lineTo(enemy.width/2, enemy.height/2 - 10);
+            ctx.lineTo(enemy.width/2 - 10, enemy.height/2);
+            ctx.lineTo(-enemy.width/2 + 10, enemy.height/2);
+            ctx.lineTo(-enemy.width/2, enemy.height/2 - 10);
+            ctx.lineTo(-enemy.width/2, -enemy.height/2 + 10);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.shadowBlur = 0;
+
+            ctx.fillStyle = isHit ? '#000' : '#00f3ff';
+            ctx.font = 'bold 15px "Noto Sans TC", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(enemy.text, 0, -4);
+
+            const barWidth = enemy.width - 20;
+            const barHeight = 5;
+            const barY = enemy.height/2 - 10;
+            
+            ctx.fillStyle = 'rgba(0,0,0,0.8)';
+            ctx.fillRect(-barWidth/2, barY, barWidth, barHeight);
+            
+            const hpRatio = Math.max(0, enemy.hp / enemy.maxHp);
+            ctx.fillStyle = hpRatio > 0.6 ? '#00f3ff' : (hpRatio > 0.3 ? '#ffde00' : '#ff003c');
+            if (enemy.hp > 0) {
+                ctx.shadowBlur = 5;
+                ctx.shadowColor = ctx.fillStyle;
+                ctx.fillRect(-barWidth/2, barY, barWidth * hpRatio, barHeight);
+                ctx.shadowBlur = 0;
+            }
+            
+            ctx.fillStyle = '#050a1f';
+            for(let k = 1; k < enemy.maxHp; k++) {
+                ctx.fillRect(-barWidth/2 + (barWidth / enemy.maxHp) * k - 0.5, barY, 1, barHeight);
+            }
+
+            ctx.restore();
+        });
+
+        ctx.save();
+        ctx.translate(player.x, player.y);
+        
+        ctx.fillStyle = 'rgba(0, 243, 255, 0.05)';
+        ctx.beginPath(); ctx.arc(0, 0, 36, 0, Math.PI*2); ctx.fill();
+        ctx.strokeStyle = 'rgba(0, 243, 255, 0.35)';
+        ctx.lineWidth = 1; ctx.stroke();
+        
+        ctx.beginPath();
+        ctx.arc(0, 0, 28, (frameCount*0.1)%Math.PI*2, (frameCount*0.1)%Math.PI*2 + Math.PI);
+        ctx.strokeStyle = 'rgba(0, 243, 255, 0.55)';
+        ctx.stroke();
+
+        if (frameCount % 2 === 0) {
+            ctx.fillStyle = '#00f3ff';
+            ctx.shadowBlur = 15; ctx.shadowColor = '#00f3ff';
+            ctx.beginPath();
+            ctx.moveTo(-8, player.height/2 - 5);
+            ctx.lineTo(8, player.height/2 - 5);
+            ctx.lineTo(0, player.height/2 + 20 + Math.random()*10);
+            ctx.closePath();
+            ctx.fill();
+            ctx.shadowBlur = 0;
         }
 
-        // 互動評分邏輯 (更新資料庫)
-        function rateExhibit(exhibitId, newRating) {
-            const docRef = db.collection('exhibits').doc(exhibitId);
-            db.runTransaction(transaction => {
-                return transaction.get(docRef).then(doc => {
-                    if (!doc.exists) return;
-                    const data = doc.data();
-                    const currentVotes = data.votes || 0;
-                    const currentRating = data.rating || 5;
-                    
-                    const totalScore = currentRating * currentVotes;
-                    const nextVotes = currentVotes + 1;
-                    const nextRating = (totalScore + newRating) / nextVotes;
+        ctx.fillStyle = '#1e1b4b';
+        ctx.strokeStyle = '#00f3ff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(0, -player.height/2 + 5);
+        ctx.lineTo(player.width/2, player.height/2);
+        ctx.lineTo(-player.width/2, player.height/2);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        
+        ctx.fillStyle = '#4c1d95';
+        ctx.beginPath();
+        ctx.moveTo(0, -player.height/2);
+        ctx.lineTo(6, player.height/2);
+        ctx.lineTo(-6, player.height/2);
+        ctx.closePath();
+        ctx.fill(); ctx.stroke();
+        
+        ctx.fillStyle = '#ff003c';
+        ctx.shadowBlur = 5; ctx.shadowColor = '#ff003c';
+        ctx.beginPath();
+        ctx.ellipse(0, -player.height/4 + 5, 4, 8, 0, 0, Math.PI*2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        
+        ctx.restore();
 
-                    transaction.update(docRef, {
-                        votes: nextVotes,
-                        rating: parseFloat(nextRating.toFixed(1))
-                    });
-                });
-            }).catch(err => {
-                console.error("評分更新失敗:", err);
-            });
-        }
-    </script>
+        particles.forEach(p => {
+            ctx.fillStyle = p.color; ctx.globalAlpha = p.life;
+            ctx.shadowBlur = 5; ctx.shadowColor = p.color;
+            ctx.fillRect(p.x, p.y, p.size, p.size);
+            ctx.shadowBlur = 0;
+        });
+        ctx.globalAlpha = 1.0;
+
+        floatingTexts.forEach(ft => {
+            ctx.fillStyle = ft.color; ctx.globalAlpha = ft.life;
+            ctx.font = `900 ${ft.fontSize}px "Orbitron", "Noto Sans TC", sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.shadowBlur = 10; ctx.shadowColor = ft.color;
+            ctx.fillText(ft.text, ft.x, ft.y);
+            ctx.shadowBlur = 0;
+        });
+        ctx.globalAlpha = 1.0;
+    }
+
+    function gameLoop() {
+        update();
+        draw();
+        animationId = requestAnimationFrame(gameLoop);
+    }
+
+    gameLoop();
+</script>
 </body>
 </html>
