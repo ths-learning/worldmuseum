@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>囚徒困境戰略版：動態賽局演算</title>
-    <!-- 本專案使用 Tailwind CSS CDN 僅供開發測試，生產環境請改用 PostCSS 安裝 -->
+    <title>囚徒困境戰略版 - 即時連線賽局</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -21,7 +20,7 @@
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col items-center justify-center p-4 selection:bg-indigo-500 selection:text-white">
 
-    <!-- 全局提示框 Modal -->
+    <!-- 全局提示框 -->
     <div id="modal-overlay" class="fixed inset-0 bg-black bg-opacity-85 z-50 hidden-screen flex items-center justify-center p-4">
         <div class="bg-gray-900 rounded-2xl max-w-sm w-full p-6 text-center border border-gray-850 shadow-2xl fade-in">
             <h3 id="modal-title" class="text-xl font-black mb-2 text-indigo-400">提示</h3>
@@ -43,25 +42,25 @@
                 <i class="fas fa-bezier-curve text-5xl text-indigo-400 animate-pulse"></i>
             </div>
             <h1 class="text-3xl font-black tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-500">囚徒困境戰略版</h1>
-            <p class="text-xs text-indigo-300 font-bold tracking-widest uppercase mt-1">賽局理論與動態決策演算法</p>
+            <p class="text-xs text-indigo-300 font-bold tracking-widest uppercase mt-1">即時連線 · 動態賽局演算</p>
             <p class="text-gray-400 mt-3 text-sm leading-relaxed">
-                消除刻板印象，擁抱理性演算。<br>
-                AI 演算子將依據你和對手的歷史決策、分差、剩餘回合數，即時調整最優化期望值。
+                2～6 人即時戰略對決，房主決定開局。<br>
+                賽局理論 AI 亦可在本地模式中與你對戰。
             </p>
         </div>
 
         <div class="w-full space-y-4">
             <button onclick="startLocalMode()" class="w-full py-4 bg-gray-900 hover:bg-gray-800 border border-gray-850 rounded-2xl font-bold flex items-center justify-between px-6 transition shadow-lg group">
-                <span class="flex items-center"><i class="fas fa-brain text-xl mr-3 text-indigo-400 group-hover:scale-110 transition"></i> 本地模式 (對戰賽局 AI)</span>
+                <span class="flex items-center"><i class="fas fa-brain text-xl mr-3 text-indigo-400 group-hover:scale-110 transition"></i> 本地模式 (對戰 AI)</span>
                 <i class="fas fa-chevron-right text-gray-600"></i>
             </button>
-            <button id="online-mode-btn" onclick="tryOpenOnlineLobby()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-bold flex items-center justify-between px-6 transition shadow-lg shadow-indigo-950/50 group">
+            <button id="online-mode-btn" onclick="enterOnlineLobby()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-bold flex items-center justify-between px-6 transition shadow-lg shadow-indigo-950/50 group">
                 <span class="flex items-center"><i class="fas fa-globe text-xl mr-3 text-white group-hover:scale-110 transition"></i> 線上模式 (2-6人即時連線)</span>
                 <i class="fas fa-chevron-right text-indigo-200"></i>
             </button>
         </div>
 
-        <!-- 規則說明 (更新版) -->
+        <!-- 規則說明 -->
         <div class="w-full mt-8 bg-gray-900/50 rounded-2xl p-4 border border-gray-850 text-xs text-gray-400 space-y-2">
             <p class="font-bold text-gray-300 mb-1 flex items-center"><i class="fas fa-info-circle mr-1.5 text-indigo-400"></i> 博弈矩陣結算規則（兩兩對決獨立結算）：</p>
             <div class="grid grid-cols-2 gap-2 text-left bg-gray-950/50 p-2.5 rounded-lg border border-gray-900 mb-2 font-mono">
@@ -104,7 +103,6 @@
                 </button>
             </div>
         </div>
-        <p class="text-center text-gray-500 text-xs mt-2"><i class="fas fa-shield-alt"></i> 線上模式需要 Firebase 配置，若未配置請使用本地模式</p>
     </div>
 
     <!-- 3. 房間等待室 -->
@@ -112,183 +110,97 @@
         <h2 class="text-2xl font-black mb-1">戰略通訊室 <span id="display-room-code" class="text-indigo-400 font-mono tracking-wider"></span></h2>
         <p class="text-gray-400 text-sm mb-6">主公集結中 (最少2人即可開戰，最多6人)</p>
         
-        <div id="waiting-players-list" class="space-y-3 mb-6">
-            <!-- 玩家列表動態生成 -->
-        </div>
+        <div id="waiting-players-list" class="space-y-3 mb-6"></div>
 
-        <button id="btn-start-game" onclick="startOnlineGame()" class="w-full py-4 bg-gray-800 text-gray-500 rounded-2xl font-bold transition cursor-not-allowed hidden" disabled>
-            等待聯防就位...
-        </button>
-        <button onclick="leaveRoom()" class="w-full py-3 bg-transparent text-gray-500 hover:text-red-400 mt-4 rounded-xl font-bold transition border border-gray-850 text-sm">
-            終止連線
-        </button>
+        <button id="btn-start-game" onclick="startOnlineGame()" class="w-full py-4 bg-gray-800 text-gray-500 rounded-2xl font-bold transition cursor-not-allowed hidden" disabled>等待聯防就位...</button>
+        <button onclick="leaveRoom()" class="w-full py-3 bg-transparent text-gray-500 hover:text-red-400 mt-4 rounded-xl font-bold transition border border-gray-850 text-sm">終止連線</button>
     </div>
 
     <!-- 4. 遊戲主畫面 (決策階段) -->
     <div id="screen-game" class="w-full max-w-md hidden-screen fade-in">
         <div class="flex justify-between items-center mb-6 bg-gray-900 p-4 rounded-2xl border border-gray-800 shadow-md">
-            <div>
-                <p class="text-xxs text-gray-500 font-bold uppercase tracking-widest font-mono">ROUND</p>
-                <p class="text-xl font-black text-indigo-400 font-mono"><span id="ui-round">1</span> / 10</p>
-            </div>
-            <div class="text-right">
-                <p class="text-xxs text-gray-500 font-bold uppercase tracking-widest font-mono">MY SCORE</p>
-                <p class="text-xl font-black text-amber-400 font-mono" id="ui-my-score">0</p>
-            </div>
+            <div><p class="text-xxs text-gray-500 font-bold uppercase tracking-widest font-mono">ROUND</p><p class="text-xl font-black text-indigo-400 font-mono"><span id="ui-round">1</span> / 10</p></div>
+            <div class="text-right"><p class="text-xxs text-gray-500 font-bold uppercase tracking-widest font-mono">MY SCORE</p><p class="text-xl font-black text-amber-400 font-mono" id="ui-my-score">0</p></div>
         </div>
-
-        <!-- 決策卡片容器 -->
-        <div id="ui-choice-cards" class="space-y-4 mb-6">
-            <!-- 動態生成對手卡片 -->
-        </div>
-
-        <button id="btn-lock-choice" onclick="submitChoice()" class="w-full py-4 bg-gray-850 text-gray-500 rounded-2xl font-bold text-lg transition shadow-lg cursor-not-allowed border border-gray-800" disabled>
-            決策矩陣未完成
-        </button>
-        
-        <p id="ui-waiting-others" class="text-center text-indigo-400 mt-4 font-semibold text-sm animate-pulse hidden font-mono">
-            <i class="fas fa-network-wired mr-1.5"></i> EVALUATING OPPONENTS DECISIONS...
-        </p>
+        <div id="ui-choice-cards" class="space-y-4 mb-6"></div>
+        <button id="btn-lock-choice" onclick="submitChoice()" class="w-full py-4 bg-gray-850 text-gray-500 rounded-2xl font-bold text-lg transition shadow-lg cursor-not-allowed border border-gray-800" disabled>決策矩陣未完成</button>
+        <p id="ui-waiting-others" class="text-center text-indigo-400 mt-4 font-semibold text-sm animate-pulse hidden font-mono"><i class="fas fa-network-wired mr-1.5"></i> EVALUATING OPPONENTS DECISIONS...</p>
     </div>
 
     <!-- 5. 回合結算畫面 -->
     <div id="screen-round-result" class="w-full max-w-md hidden-screen fade-in">
         <h2 class="text-2xl font-black text-center mb-1">對決結果日誌</h2>
         <p class="text-center text-xs text-gray-500 tracking-wider uppercase mb-6 font-mono">STAGE <span id="res-ui-round" class="text-indigo-400 font-bold"></span> REPORT</p>
-
-        <!-- 本地賽局限定的 AI 遙測面板 -->
-        <div id="local-ai-minds" class="bg-gray-900 rounded-2xl border border-gray-800 p-4 mb-5 shadow-xl hidden">
-            <h3 class="text-xs font-black text-gray-400 mb-3 border-b border-gray-850 pb-2 flex items-center font-mono">
-                <i class="fas fa-satellite-dish mr-1.5 text-indigo-400"></i> GAME-THEORETIC TELEMETRY (AI 演算數據)
-            </h3>
-            <div id="ai-psychology-container" class="space-y-4 text-xs font-mono">
-                <!-- 動態注入 AI 精準遙測 -->
-            </div>
-        </div>
-
-        <div class="bg-gray-900 rounded-2xl border border-gray-800 p-4 mb-5 shadow-xl">
-            <h3 class="text-xs font-black text-gray-400 mb-3 border-b border-gray-850 pb-2 flex items-center font-mono">
-                <i class="fas fa-chart-line mr-1.5 text-amber-500"></i> LEADERBOARD (即時積分榜)
-            </h3>
-            <div id="res-ui-leaderboard" class="space-y-2 font-mono">
-                <!-- 動態生成 -->
-            </div>
-        </div>
-
-        <div class="bg-gray-900 rounded-2xl border border-gray-800 p-4 mb-6 shadow-xl">
-            <h3 class="text-xs font-black text-gray-400 mb-3 border-b border-gray-850 pb-2 flex items-center font-mono">
-                <i class="fas fa-file-code mr-1.5 text-indigo-400"></i> DECISION MATRIX LOGS (決策交叉比對)
-            </h3>
-            <div id="res-ui-logs" class="space-y-3 max-h-60 overflow-y-auto no-scrollbar text-sm font-mono">
-                <!-- 交叉比對 -->
-            </div>
-        </div>
-
-        <button id="btn-next-round" onclick="readyForNextRound()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-bold transition shadow-lg shadow-indigo-950/50 text-white">
-            進入下一決策階段 (Next Stage)
-        </button>
+        <div id="local-ai-minds" class="bg-gray-900 rounded-2xl border border-gray-800 p-4 mb-5 shadow-xl hidden"><h3 class="text-xs font-black text-gray-400 mb-3 border-b border-gray-850 pb-2 flex items-center font-mono"><i class="fas fa-satellite-dish mr-1.5 text-indigo-400"></i> GAME-THEORETIC TELEMETRY</h3><div id="ai-psychology-container" class="space-y-4 text-xs font-mono"></div></div>
+        <div class="bg-gray-900 rounded-2xl border border-gray-800 p-4 mb-5 shadow-xl"><h3 class="text-xs font-black text-gray-400 mb-3 border-b border-gray-850 pb-2 flex items-center font-mono"><i class="fas fa-chart-line mr-1.5 text-amber-500"></i> LEADERBOARD</h3><div id="res-ui-leaderboard" class="space-y-2 font-mono"></div></div>
+        <div class="bg-gray-900 rounded-2xl border border-gray-800 p-4 mb-6 shadow-xl"><h3 class="text-xs font-black text-gray-400 mb-3 border-b border-gray-850 pb-2 flex items-center font-mono"><i class="fas fa-file-code mr-1.5 text-indigo-400"></i> DECISION MATRIX LOGS</h3><div id="res-ui-logs" class="space-y-3 max-h-60 overflow-y-auto no-scrollbar text-sm font-mono"></div></div>
+        <button id="btn-next-round" onclick="readyForNextRound()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-bold transition shadow-lg shadow-indigo-950/50 text-white">進入下一決策階段</button>
     </div>
 
     <!-- 6. 最終結算畫面 -->
     <div id="screen-final" class="w-full max-w-md hidden-screen fade-in text-center">
-        <div class="inline-flex p-4 bg-indigo-950/30 rounded-full border border-indigo-500/30 mb-4 animate-bounce">
-            <i class="fas fa-trophy text-5xl text-amber-400"></i>
-        </div>
+        <div class="inline-flex p-4 bg-indigo-950/30 rounded-full border border-indigo-500/30 mb-4 animate-bounce"><i class="fas fa-trophy text-5xl text-amber-400"></i></div>
         <h2 class="text-3xl font-black mb-1 text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-yellow-300 to-orange-400 font-mono">SIMULATION COMPLETE</h2>
         <p class="text-gray-400 text-sm mb-8">賽局終端模擬結算</p>
-
-        <div id="final-leaderboard" class="bg-gray-900 rounded-2xl border border-gray-800 p-4 mb-8 space-y-3 shadow-2xl font-mono">
-            <!-- 終榜 -->
-        </div>
-
-        <button onclick="location.reload()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold transition shadow-lg">
-            重啟戰略模擬
-        </button>
+        <div id="final-leaderboard" class="bg-gray-900 rounded-2xl border border-gray-800 p-4 mb-8 space-y-3 shadow-2xl font-mono"></div>
+        <button onclick="location.reload()" class="w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold transition shadow-lg">重啟戰略模擬</button>
     </div>
 
-    <!-- Firebase SDKs (僅當存在設定時才會啟用) -->
     <script type="module">
-        // ********** Firebase 配置檢測 **********
-        // 此區塊會嘗試讀取 __firebase_config (需由後端注入)，若無則完全停用線上模式
-        let firebaseConfig = null;
-        try {
-            if (typeof __firebase_config !== 'undefined') {
-                firebaseConfig = JSON.parse(__firebase_config);
-            }
-        } catch(e) { console.warn("Firebase config parse error, online mode disabled."); }
-        
-        const isOnlineEnabled = !!(firebaseConfig && Object.keys(firebaseConfig).length > 0);
-        
-        // 導入 Firebase 模組 (僅當需要時)
-        let initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, deleteField;
-        let app, auth, db;
-        
-        if (isOnlineEnabled) {
-            // 動態導入 Firebase
-            const firebaseMod = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
-            const authMod = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
-            const firestoreMod = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
-            initializeApp = firebaseMod.initializeApp;
-            getAuth = authMod.getAuth;
-            signInAnonymously = authMod.signInAnonymously;
-            onAuthStateChanged = authMod.onAuthStateChanged;
-            getFirestore = firestoreMod.getFirestore;
-            doc = firestoreMod.doc;
-            setDoc = firestoreMod.setDoc;
-            getDoc = firestoreMod.getDoc;
-            updateDoc = firestoreMod.updateDoc;
-            onSnapshot = firestoreMod.onSnapshot;
-            deleteField = firestoreMod.deleteField;
-            
-            app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
-        }
-        
+        // ==================== Firebase 配置 (已內嵌) ====================
+        const firebaseConfig = {
+            apiKey: "AIzaSyAz26he3jfVUohRBCS0tppftwrC1fkyoAI",
+            authDomain: "tribattle-2510b.firebaseapp.com",
+            databaseURL: "https://tribattle-2510b-default-rtdb.asia-southeast1.firebasedatabase.app",
+            projectId: "tribattle-2510b",
+            storageBucket: "tribattle-2510b.firebasestorage.app",
+            messagingSenderId: "13092666076",
+            appId: "1:13092666076:web:d1e88d634d0d3ea4751219",
+            measurementId: "G-VK21YBY2CB"
+        };
+        // ================================================================
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot, deleteField } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const isOnlineEnabled = true;
+
+        // ---------- 全域變數 ----------
         let currentUser = null;
-        
-        // 輔助函數
+        let currentMode = '';      // 'local' or 'online'
+        let myId = '';
+        let myChoices = {};
+        let currentRoomId = null;
+        let unsubscribeRoom = null;
+        let isHost = false;
+        let isSubmitting = false;
+        let localState = null;
+        let onlineState = null;
+
+        // ---------- UI 輔助函數 ----------
         window.showScreen = function(screenId) {
             const screens = ['screen-loading', 'screen-menu', 'screen-lobby', 'screen-waiting', 'screen-game', 'screen-round-result', 'screen-final'];
             screens.forEach(id => document.getElementById(id).classList.add('hidden-screen'));
             document.getElementById(screenId).classList.remove('hidden-screen');
         };
-        
         window.showModal = function(title, msg) {
             document.getElementById('modal-title').innerText = title;
             document.getElementById('modal-msg').innerHTML = msg;
             document.getElementById('modal-overlay').classList.remove('hidden-screen');
         };
-        window.closeModal = function() {
-            document.getElementById('modal-overlay').classList.add('hidden-screen');
-        };
-        
-        // 線上模式入口檢查 (避免未配置 Firebase 導致“網路尚未就緒”)
-        window.tryOpenOnlineLobby = function() {
-            if (!isOnlineEnabled) {
-                showModal('無法使用線上模式', '當前環境未檢測到 Firebase 配置，無法建立網路連線。<br><br>請改用「本地模式」進行遊戲，或聯絡管理員設定 Firebase。');
-                return;
-            }
-            if (!currentUser) {
-                showModal('身分驗證中', '正在與伺服器建立安全連線，請稍後再試。若持續失敗，請使用本地模式。');
-                return;
-            }
+        window.closeModal = function() { document.getElementById('modal-overlay').classList.add('hidden-screen'); };
+
+        window.enterOnlineLobby = function() {
+            if (!currentUser) { showModal('身分驗證中', '正在與伺服器建立連線，請稍後再試。'); return; }
             showScreen('screen-lobby');
         };
-        
-        // ----- 全域變數 -----
-        let currentMode = ''; 
-        let myId = ''; 
-        let myChoices = {}; 
-        let currentRoomId = null;
-        let unsubscribeRoom = null;
-        let isHost = false;
-        let isSubmitting = false;    // 避免重複提交
-        let localState = null;
-        let onlineState = null;
-        
+
         // ==========================================
-        // 核心計分演算法 (支援合作連擊 + 攻擊連減 + 新版背刺)
+        // 核心計分演算法 (合作連擊 + 攻擊連減 + 背刺)
         // ==========================================
         function calculateRound(playersMap, choicesMap, currentCoopStreaks, currentAttackStreaks) {
             const uids = Object.keys(playersMap);
@@ -296,160 +208,111 @@
             let logs = [];
             let nextCoopStreaks = { ...currentCoopStreaks };
             let nextAttackStreaks = { ...currentAttackStreaks };
-            
             uids.forEach(uid => roundPoints[uid] = 0);
-    
             for (let i = 0; i < uids.length; i++) {
-                for (let j = i + 1; j < uids.length; j++) {
-                    const p1 = uids[i];
-                    const p2 = uids[j];
+                for (let j = i+1; j < uids.length; j++) {
+                    const p1 = uids[i], p2 = uids[j];
                     const c1 = choicesMap[p1]?.[p2] || 'C';
                     const c2 = choicesMap[p2]?.[p1] || 'C';
-                    const pairKey = [p1, p2].sort().join('_');
-    
+                    const pairKey = [p1,p2].sort().join('_');
                     let coopStreak = nextCoopStreaks[pairKey] || 0;
                     let attackStreak = nextAttackStreaks[pairKey] || 0;
-    
-                    let p1Delta = 0, p2Delta = 0;
-                    let streakTriggered = false;
-                    let extraAttackPenalty = 0;
-    
+                    let p1Delta=0, p2Delta=0, extraAttackPenalty=0, streakTriggered=false;
                     if (c1 === 'C' && c2 === 'C') {
-                        coopStreak += 1;
+                        coopStreak++;
                         nextCoopStreaks[pairKey] = coopStreak;
                         let payout = 20;
                         if (coopStreak === 2) payout = 30;
                         if (coopStreak >= 3) payout = 40;
-                        p1Delta = payout;
-                        p2Delta = payout;
-                        streakTriggered = coopStreak > 1;
+                        p1Delta = payout; p2Delta = payout;
+                        streakTriggered = (coopStreak > 1);
                         nextAttackStreaks[pairKey] = 0;
-                    } 
-                    else if (c1 === 'A' && c2 === 'A') {
-                        let basePenalty = -20;
+                    } else if (c1 === 'A' && c2 === 'A') {
+                        let base = -20;
                         let extra = 0;
-                        if (attackStreak === 1) extra = -30;      // 連續第二輪
-                        else if (attackStreak >= 2) extra = -40;  // 第三輪及以後
-                        p1Delta = basePenalty + extra;
-                        p2Delta = basePenalty + extra;
+                        if (attackStreak === 1) extra = -30;
+                        else if (attackStreak >= 2) extra = -40;
+                        p1Delta = base+extra; p2Delta = base+extra;
                         extraAttackPenalty = extra;
-                        nextAttackStreaks[pairKey] = attackStreak + 1;
+                        nextAttackStreaks[pairKey] = attackStreak+1;
                         nextCoopStreaks[pairKey] = 0;
-                    } 
-                    else if (c1 === 'C' && c2 === 'A') {
-                        p1Delta = 0;
-                        p2Delta = 20;
-                        nextCoopStreaks[pairKey] = 0;
-                        nextAttackStreaks[pairKey] = 0;
-                    } 
-                    else if (c1 === 'A' && c2 === 'C') {
-                        p1Delta = 20;
-                        p2Delta = 0;
-                        nextCoopStreaks[pairKey] = 0;
-                        nextAttackStreaks[pairKey] = 0;
-                    }
-    
-                    roundPoints[p1] += p1Delta;
-                    roundPoints[p2] += p2Delta;
-    
-                    logs.push({ 
-                        p1, p2, c1, c2, p1Delta, p2Delta, 
-                        coopStreak: nextCoopStreaks[pairKey],
-                        streakTriggered,
-                        extraAttackPenalty,
-                        isAttackStreak: (c1 === 'A' && c2 === 'A' && extraAttackPenalty !== 0)
-                    });
+                    } else if (c1 === 'C' && c2 === 'A') { p1Delta = 0; p2Delta = 20; nextCoopStreaks[pairKey]=0; nextAttackStreaks[pairKey]=0; }
+                    else if (c1 === 'A' && c2 === 'C') { p1Delta = 20; p2Delta = 0; nextCoopStreaks[pairKey]=0; nextAttackStreaks[pairKey]=0; }
+                    roundPoints[p1] += p1Delta; roundPoints[p2] += p2Delta;
+                    logs.push({ p1,p2,c1,c2, p1Delta,p2Delta, streakTriggered, extraAttackPenalty, isAttackStreak: (c1==='A'&&c2==='A'&&extraAttackPenalty!==0) });
                 }
             }
-    
             let updatedPlayers = JSON.parse(JSON.stringify(playersMap));
-            uids.forEach(uid => {
-                updatedPlayers[uid].score += roundPoints[uid];
-            });
-    
+            uids.forEach(uid => updatedPlayers[uid].score += roundPoints[uid]);
             return { updatedPlayers, logs, nextCoopStreaks, nextAttackStreaks };
         }
-    
+
         // ==========================================
-        // 本地模式 AI 演算 (三人)
+        // 本地模式 AI 邏輯 (三人)
         // ==========================================
         function runStrategicAI(round, state) {
             const aiChoices = { 'p2': {}, 'p3': {} };
             const logs = state.lastLogs;
             let lastChoiceMap = { 'p1': {}, 'p2': {}, 'p3': {} };
-            if (round > 1 && logs) {
-                logs.forEach(l => {
-                    lastChoiceMap[l.p1][l.p2] = l.c1;
-                    lastChoiceMap[l.p2][l.p1] = l.c2;
-                });
-            }
+            if (round > 1 && logs) logs.forEach(l => { lastChoiceMap[l.p1][l.p2]=l.c1; lastChoiceMap[l.p2][l.p1]=l.c2; });
             const totalRounds = state.maxRounds;
-            const endgameFactor = (round - 1) / (totalRounds - 1);
-            ['p2', 'p3'].forEach(aiId => {
+            const endgameFactor = (round-1)/(totalRounds-1);
+            ['p2','p3'].forEach(aiId => {
                 const mind = state.aiMinds[aiId];
-                const otherPlayers = ['p1', 'p2', 'p3'].filter(id => id !== aiId);
-                otherPlayers.forEach(opponentId => {
-                    const oldTrust = mind.trustScores[opponentId] || 0.8;
-                    const lastAction = lastChoiceMap[opponentId]?.[aiId] || 'C';
-                    const actualValue = lastAction === 'C' ? 1.0 : 0.0;
-                    const alpha = 0.4;
-                    let currentTrust = (alpha * actualValue) + ((1.0 - alpha) * oldTrust);
-                    mind.trustScores[opponentId] = currentTrust;
+                const others = ['p1','p2','p3'].filter(id=>id!==aiId);
+                others.forEach(opp=>{
+                    const oldTrust = mind.trustScores[opp]||0.8;
+                    const lastAct = lastChoiceMap[opp]?.[aiId]||'C';
+                    const actual = lastAct==='C'?1:0;
+                    let trust = 0.4*actual + 0.6*oldTrust;
+                    mind.trustScores[opp] = trust;
                     const myScore = state.players[aiId].score;
-                    const oppScore = state.players[opponentId].score;
-                    let curbLeaderImpact = 0.0;
-                    if (oppScore - myScore > 30) curbLeaderImpact = Math.min(0.3, (oppScore - myScore - 30) * 0.005);
-                    let pCooperate = currentTrust * (1.0 - endgameFactor * 0.45) - curbLeaderImpact;
-                    pCooperate = Math.max(0.0, Math.min(1.0, pCooperate));
-                    const decision = Math.random() < pCooperate ? 'C' : 'A';
-                    aiChoices[aiId][opponentId] = decision;
-                    if (opponentId === 'p1') {
+                    const oppScore = state.players[opp].score;
+                    let curb = 0;
+                    if(oppScore - myScore > 30) curb = Math.min(0.3, (oppScore-myScore-30)*0.005);
+                    let pCoop = trust * (1 - endgameFactor*0.45) - curb;
+                    pCoop = Math.min(1, Math.max(0, pCoop));
+                    const decision = Math.random() < pCoop ? 'C' : 'A';
+                    aiChoices[aiId][opp] = decision;
+                    if(opp === 'p1') {
                         let reason = '';
-                        if (endgameFactor > 0.8) reason = `賽局接近極限 (折現率 ${(endgameFactor*100).toFixed(0)}%)，逆向歸納防範機制優先。`;
-                        else if (curbLeaderImpact > 0.1) reason = `玩家領先優勢 (優勢抑制權重 ${(curbLeaderImpact*100).toFixed(0)}%)，實施遏制。`;
-                        else if (currentTrust > 0.7) reason = `信任結構健全 (信任率 ${(currentTrust*100).toFixed(0)}%)，傾向追求連擊最大收益。`;
-                        else reason = `歷史信任赤字 (信任率 ${(currentTrust*100).toFixed(0)}%)，採取保險防御策略。`;
+                        if(endgameFactor>0.8) reason = `賽局接近極限 (折現率 ${(endgameFactor*100).toFixed(0)}%)，逆向歸納防範機制優先。`;
+                        else if(curb>0.1) reason = `玩家領先優勢 (抑制權重 ${(curb*100).toFixed(0)}%)，實施遏制。`;
+                        else if(trust>0.7) reason = `信任結構健全 (信任率 ${(trust*100).toFixed(0)}%)，傾向追求連擊最大收益。`;
+                        else reason = `歷史信任赤字 (信任率 ${(trust*100).toFixed(0)}%)，採取保險防御策略。`;
                         mind.lastDecisionReason = reason;
-                        mind.lastMetrics = { trust: currentTrust, discount: endgameFactor, coopProb: pCooperate };
+                        mind.lastMetrics = { trust, discount: endgameFactor, coopProb: pCoop };
                     }
                 });
             });
             return aiChoices;
         }
-        
-        // 本地模式啟動
+
+        // ---------- 本地模式 ----------
         window.startLocalMode = function() {
             currentMode = 'local';
             myId = 'p1';
             localState = {
-                round: 1,
-                maxRounds: 10,
-                players: {
-                    'p1': { name: '玩家 (你)', score: 0 },
-                    'p2': { name: 'Agent Alpha (演算子 α)', score: 0 },
-                    'p3': { name: 'Agent Beta (演算子 β)', score: 0 }
-                },
-                coopStreaks: {},
-                attackStreaks: {},
-                lastLogs: [],
+                round: 1, maxRounds: 10,
+                players: { 'p1':{name:'玩家 (你)',score:0}, 'p2':{name:'Agent Alpha',score:0}, 'p3':{name:'Agent Beta',score:0} },
+                coopStreaks: {}, attackStreaks: {}, lastLogs: [],
                 aiMinds: {
-                    'p2': { trustScores: { 'p1': 0.8, 'p3': 0.8 }, lastDecisionReason: '系統初始化，評估初始賽局預期。', lastMetrics: { trust: 0.8, discount: 0.0, coopProb: 0.8 } },
-                    'p3': { trustScores: { 'p1': 0.8, 'p2': 0.8 }, lastDecisionReason: '系統初始化，評估初始賽局預期。', lastMetrics: { trust: 0.8, discount: 0.0, coopProb: 0.8 } }
+                    'p2':{ trustScores:{'p1':0.8,'p3':0.8}, lastDecisionReason:'系統初始化', lastMetrics:{trust:0.8,discount:0,coopProb:0.8} },
+                    'p3':{ trustScores:{'p1':0.8,'p2':0.8}, lastDecisionReason:'系統初始化', lastMetrics:{trust:0.8,discount:0,coopProb:0.8} }
                 }
             };
             document.getElementById('local-ai-minds').classList.remove('hidden');
             prepareGameUI(localState.players, localState.round, localState.coopStreaks, localState.attackStreaks);
         };
-        
-        // 輔助 UI 建立函數 (共用)
+
+        // 共用的 UI 生成
         function prepareGameUI(players, round, coopStreaks, attackStreaks) {
             myChoices = {};
             document.getElementById('ui-round').innerText = round;
             document.getElementById('ui-my-score').innerText = players[myId]?.score || 0;
             document.getElementById('ui-waiting-others').classList.add('hidden');
             const lockBtn = document.getElementById('btn-lock-choice');
-            lockBtn.disabled = true;
-            lockBtn.innerText = "決策矩陣未完成";
+            lockBtn.disabled = true; lockBtn.innerText = "決策矩陣未完成";
             lockBtn.className = "w-full py-4 bg-gray-900 text-gray-600 rounded-2xl font-bold border border-gray-800 cursor-not-allowed";
             const container = document.getElementById('ui-choice-cards');
             container.innerHTML = '';
@@ -459,8 +322,8 @@
                 const coopCnt = coopStreaks[streakKey] || 0;
                 let streakBadge = '';
                 if (coopCnt > 0) {
-                    let levelColor = coopCnt >= 3 ? 'from-amber-500 to-yellow-450 text-gray-950' : 'from-emerald-500 to-teal-400 text-white';
-                    streakBadge = `<div class="inline-flex items-center gap-1 bg-gradient-to-r ${levelColor} text-xxs px-2 py-0.5 rounded-full font-mono"><i class="fas fa-fire"></i> 連擊 Lv.${coopCnt}</div>`;
+                    let color = coopCnt >=3 ? 'from-amber-500 to-yellow-450 text-gray-950' : 'from-emerald-500 to-teal-400 text-white';
+                    streakBadge = `<div class="inline-flex items-center gap-1 bg-gradient-to-r ${color} text-xxs px-2 py-0.5 rounded-full font-mono"><i class="fas fa-fire"></i> 連擊 Lv.${coopCnt}</div>`;
                 }
                 const card = document.createElement('div');
                 card.className = "bg-gray-900 p-5 rounded-2xl border border-gray-800 shadow-xl";
@@ -478,30 +341,30 @@
             });
             showScreen('screen-game');
         }
-        
+
         window.selectChoice = function(targetId, choiceType, btn) {
             myChoices[targetId] = choiceType;
             const parent = btn.parentElement;
-            parent.querySelectorAll('button').forEach(b => b.classList.remove('btn-active-c', 'btn-active-a'));
-            btn.classList.add(choiceType === 'C' ? 'btn-active-c' : 'btn-active-a');
-            const oppCount = currentMode === 'local' ? 2 : Object.keys(onlineState?.players || {}).length - 1;
-            if (Object.keys(myChoices).length === oppCount) {
+            parent.querySelectorAll('button').forEach(b => b.classList.remove('btn-active-c','btn-active-a'));
+            btn.classList.add(choiceType==='C'?'btn-active-c':'btn-active-a');
+            const oppCount = (currentMode==='local')?2:(Object.keys(onlineState?.players||{}).length-1);
+            if(Object.keys(myChoices).length === oppCount) {
                 const lockBtn = document.getElementById('btn-lock-choice');
                 lockBtn.disabled = false;
                 lockBtn.className = "w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-2xl font-black shadow-lg uppercase";
                 lockBtn.innerText = "呈交並鎖定戰略";
             }
         };
-        
+
         window.submitChoice = async function() {
-            if (isSubmitting) return;
+            if(isSubmitting) return;
             isSubmitting = true;
             document.getElementById('btn-lock-choice').classList.add('hidden');
             document.getElementById('ui-waiting-others').classList.remove('hidden');
-            if (currentMode === 'local') {
+            if(currentMode === 'local') {
                 setTimeout(() => {
                     const aiChoices = runStrategicAI(localState.round, localState);
-                    let allChoices = { 'p1': myChoices, ...aiChoices };
+                    const allChoices = { 'p1': myChoices, ...aiChoices };
                     const { updatedPlayers, logs, nextCoopStreaks, nextAttackStreaks } = calculateRound(localState.players, allChoices, localState.coopStreaks, localState.attackStreaks);
                     localState.players = updatedPlayers;
                     localState.lastLogs = logs;
@@ -510,75 +373,201 @@
                     showRoundResult(localState.players, localState.lastLogs, localState.round);
                     isSubmitting = false;
                 }, 200);
-            } else if (currentMode === 'online' && currentRoomId && db) {
-                try { await updateDoc(doc(db, 'gameRooms', currentRoomId), { [`currentChoices.${myId}`]: myChoices }); } 
-                catch(e) { showModal('網絡錯誤', '送出選擇失敗，請檢查連線'); }
+            } else if(currentMode === 'online' && currentRoomId && db) {
+                try {
+                    await updateDoc(doc(db, 'rooms', currentRoomId), { [`currentChoices.${myId}`]: myChoices });
+                } catch(e) { showModal('網絡錯誤', '送出選擇失敗，請檢查連線'); }
                 isSubmitting = false;
             } else { isSubmitting = false; }
         };
-        
+
         function showRoundResult(players, logs, round) {
             document.getElementById('res-ui-round').innerText = round;
-            if (currentMode === 'local' && localState) {
+            if(currentMode === 'local' && localState) {
                 document.getElementById('local-ai-minds').classList.remove('hidden');
-                const psychContainer = document.getElementById('ai-psychology-container');
-                psychContainer.innerHTML = '';
-                Object.entries(localState.aiMinds).forEach(([aiId, mind]) => {
-                    const name = players[aiId]?.name || aiId;
+                const psych = document.getElementById('ai-psychology-container');
+                psych.innerHTML = '';
+                Object.entries(localState.aiMinds).forEach(([aid, mind]) => {
+                    const name = players[aid]?.name || aid;
                     const trust = (mind.lastMetrics.trust*100).toFixed(1);
-                    psychContainer.innerHTML += `<div class="bg-gray-950 p-4 rounded-xl border border-gray-850"><div class="font-bold text-indigo-400">${name}</div><p class="text-gray-300 text-xs my-1">${mind.lastDecisionReason}</p><div class="text-xxs text-gray-400">信任權重: ${trust}% | 合作機率: ${(mind.lastMetrics.coopProb*100).toFixed(0)}%</div></div>`;
+                    psych.innerHTML += `<div class="bg-gray-950 p-4 rounded-xl border border-gray-850"><div class="font-bold text-indigo-400">${name}</div><p class="text-gray-300 text-xs my-1">${mind.lastDecisionReason}</p><div class="text-xxs text-gray-400">信任權重: ${trust}% | 合作機率: ${(mind.lastMetrics.coopProb*100).toFixed(0)}%</div></div>`;
                 });
-            } else document.getElementById('local-ai-minds').classList.add('hidden');
+            } else { document.getElementById('local-ai-minds').classList.add('hidden'); }
             const sorted = Object.keys(players).sort((a,b)=>players[b].score-players[a].score);
             const lb = document.getElementById('res-ui-leaderboard');
             lb.innerHTML = sorted.map((uid,idx)=>`<div class="flex justify-between p-3 rounded-xl ${uid===myId?'bg-indigo-950/40 border-indigo-800':'bg-gray-950/50'}"><span>${idx===0?'🏆':`#${idx+1}`} ${players[uid].name}</span><span class="font-mono font-bold">${players[uid].score}</span></div>`).join('');
-            const logContainer = document.getElementById('res-ui-logs');
-            logContainer.innerHTML = logs.map(log=>{
+            const logDiv = document.getElementById('res-ui-logs');
+            logDiv.innerHTML = logs.map(log=>{
                 const n1=players[log.p1]?.name||log.p1, n2=players[log.p2]?.name||log.p2;
-                let extraMsg = '';
-                if (log.isAttackStreak) extraMsg = `<div class="text-xxs text-red-300 mt-1"><i class="fas fa-bomb"></i> 攻擊連減懲罰 ${log.extraAttackPenalty} 點！</div>`;
-                else if (log.streakTriggered) extraMsg = `<div class="text-xxs text-amber-300 mt-1"><i class="fas fa-fire"></i> 合作連擊爆發！</div>`;
-                return `<div class="bg-gray-950/40 p-3 rounded-xl border-l-4 border-indigo-500"><div class="flex justify-between text-xs"><span>${n1}</span><span>VS</span><span>${n2}</span></div><div class="flex justify-between mt-1"><span>${log.c1==='C'?'🤝合作':'⚔️攻擊'}</span><span>${log.p1Delta>0?`+${log.p1Delta}`:log.p1Delta}</span><span>${log.c2==='C'?'🤝合作':'⚔️攻擊'}</span><span>${log.p2Delta>0?`+${log.p2Delta}`:log.p2Delta}</span></div>${extraMsg}</div>`;
+                let extra = '';
+                if(log.isAttackStreak) extra = `<div class="text-xxs text-red-300 mt-1"><i class="fas fa-bomb"></i> 攻擊連減懲罰 ${log.extraAttackPenalty} 點！</div>`;
+                else if(log.streakTriggered) extra = `<div class="text-xxs text-amber-300 mt-1"><i class="fas fa-fire"></i> 合作連擊爆發！</div>`;
+                return `<div class="bg-gray-950/40 p-3 rounded-xl border-l-4 border-indigo-500"><div class="flex justify-between text-xs"><span>${n1}</span><span>VS</span><span>${n2}</span></div><div class="flex justify-between mt-1"><span>${log.c1==='C'?'🤝合作':'⚔️攻擊'}</span><span>${log.p1Delta>0?`+${log.p1Delta}`:log.p1Delta}</span><span>${log.c2==='C'?'🤝合作':'⚔️攻擊'}</span><span>${log.p2Delta>0?`+${log.p2Delta}`:log.p2Delta}</span></div>${extra}</div>`;
             }).join('');
             document.getElementById('btn-next-round').disabled = false;
             showScreen('screen-round-result');
         }
-        
+
         window.readyForNextRound = async function() {
             const btn = document.getElementById('btn-next-round');
-            btn.disabled = true;
-            btn.innerText = "配置中...";
-            if (currentMode === 'local') {
-                if (localState.round >= 10) showFinalResult(localState.players);
+            btn.disabled = true; btn.innerText = "配置中...";
+            if(currentMode === 'local') {
+                if(localState.round >= 10) showFinalResult(localState.players);
                 else { localState.round++; prepareGameUI(localState.players, localState.round, localState.coopStreaks, localState.attackStreaks); }
-            } else if (currentMode === 'online' && currentRoomId && db) {
-                await updateDoc(doc(db, 'gameRooms', currentRoomId), { [`players.${myId}.ready`]: true });
+            } else if(currentMode === 'online' && currentRoomId && db) {
+                await updateDoc(doc(db, 'rooms', currentRoomId), { [`players.${myId}.ready`]: true });
             }
         };
-        
+
         function showFinalResult(players) {
             const sorted = Object.keys(players).sort((a,b)=>players[b].score-players[a].score);
-            document.getElementById('final-leaderboard').innerHTML = sorted.map((uid,i)=>`<div class="flex justify-between p-4 rounded-xl border ${i===0?'border-amber-600 bg-amber-950/30':''}"><span>${i===0?'🏆冠軍':'#'+(i+1)} ${players[uid].name}</span><span class="font-mono">${players[uid].score} PT</span></div>`).join('');
+            const container = document.getElementById('final-leaderboard');
+            container.innerHTML = sorted.map((uid,i)=>`<div class="flex justify-between p-4 rounded-xl border ${i===0?'border-amber-600 bg-amber-950/30':''}"><span>${i===0?'🏆冠軍':'#'+(i+1)} ${players[uid].name}</span><span class="font-mono">${players[uid].score} PT</span></div>`).join('');
             showScreen('screen-final');
         }
-        
-        // 線上模式輔助函數 (僅當 firebase 啟用時才會被調用，此處簡單佔位)
-        window.createRoom = async function() { if(!isOnlineEnabled||!currentUser) return showModal('無法創建','線上模式未啟用或尚未驗證'); /* 完整實作已在上方 module 但需掛載全域，因篇幅保留核心，實際用戶會看到繼承邏輯——但此演示提供完整本地模式，線上需配置 Firebase */ showModal('提示','需配置 Firebase 才能使用線上模式，請使用本地模式。'); };
-        window.joinRoom = async function() { showModal('提示','線上模式需要 Firebase 配置，請使用本地模式。'); };
-        window.startOnlineGame = function() {};
-        window.leaveRoom = function() { if(unsubscribeRoom) unsubscribeRoom(); showScreen('screen-menu'); };
-        
-        // 非同步初始化認證
-        if (isOnlineEnabled && auth) {
-            onAuthStateChanged(auth, (user) => {
-                if (user) { currentUser = user; myId = user.uid; if(document.getElementById('screen-loading').classList.contains('hidden-screen')===false) showScreen('screen-menu'); }
-                else { signInAnonymously(auth).catch(e=>console.warn); }
-            });
-            signInAnonymously(auth).catch(e=>console.warn);
-            setTimeout(()=>{ if(!currentUser) showModal('連線狀態','Firebase 連線中，若持續失敗請使用本地模式'); }, 1500);
-        } else {
-            setTimeout(() => { showScreen('screen-menu'); }, 500);
+
+        // ==================== 線上模式完整實作 ====================
+        window.createRoom = async function() {
+            if(!currentUser) { showModal('無法創建','尚未登入，請稍後再試'); return; }
+            const name = document.getElementById('player-name-input').value.trim() || '謀士_Player';
+            const roomCode = Math.floor(1000+Math.random()*9000).toString();
+            const roomRef = doc(db, 'rooms', roomCode);
+            try {
+                showScreen('screen-loading');
+                await setDoc(roomRef, {
+                    id: roomCode, host: currentUser.uid, status: 'waiting', round: 1,
+                    players: { [currentUser.uid]: { name, score: 0, ready: false } },
+                    currentChoices: {}, coopStreaks: {}, attackStreaks: {}, lastLogs: []
+                });
+                await joinRoomLogic(roomCode, name);
+            } catch(e) { console.error(e); showModal('錯誤', '創建房間失敗，請檢查 Firebase 權限'); showScreen('screen-lobby'); }
+        };
+
+        window.joinRoom = async function() {
+            if(!currentUser) return showModal('無法加入','尚未登入');
+            const code = document.getElementById('room-code-input').value.trim();
+            const name = document.getElementById('player-name-input').value.trim() || '謀士_Player';
+            if(code.length !== 4) return showModal('格式錯誤','請輸入4位數字房號');
+            try {
+                showScreen('screen-loading');
+                const roomRef = doc(db, 'rooms', code);
+                const snap = await getDoc(roomRef);
+                if(!snap.exists()) { showModal('房間不存在','請檢查房號'); showScreen('screen-lobby'); return; }
+                const data = snap.data();
+                if(data.status !== 'waiting') { showModal('已開始','賽局已開始，無法加入'); showScreen('screen-lobby'); return; }
+                if(Object.keys(data.players).length >= 6 && !data.players[currentUser.uid]) { showModal('人數已滿','房間已達6人上限'); showScreen('screen-lobby'); return; }
+                await updateDoc(roomRef, { [`players.${currentUser.uid}`]: { name, score:0, ready:false } });
+                await joinRoomLogic(code, name);
+            } catch(e) { console.error(e); showModal('異常','加入失敗'); showScreen('screen-lobby'); }
+        };
+
+        async function joinRoomLogic(roomId, name) {
+            currentMode = 'online';
+            currentRoomId = roomId;
+            const roomRef = doc(db, 'rooms', roomId);
+            if(unsubscribeRoom) unsubscribeRoom();
+            unsubscribeRoom = onSnapshot(roomRef, (snap) => {
+                if(!snap.exists()) { showModal('房間已關閉','主機已終止連線'); leaveRoom(); return; }
+                onlineState = snap.data();
+                isHost = (onlineState.host === currentUser.uid);
+                processOnlineState();
+            }, (err) => { console.error(err); showModal('連線錯誤','即時同步中斷'); });
+            showScreen('screen-waiting');
         }
+
+        window.leaveRoom = function() {
+            if(unsubscribeRoom) unsubscribeRoom();
+            currentRoomId = null; onlineState = null; isHost = false;
+            document.getElementById('local-ai-minds').classList.add('hidden');
+            showScreen('screen-menu');
+        };
+
+        window.startOnlineGame = function() {
+            if(!isHost || !currentRoomId) return;
+            const playerCount = Object.keys(onlineState?.players||{}).length;
+            if(playerCount < 2) { showModal('人數不足','至少需要2位玩家才能開始'); return; }
+            updateDoc(doc(db, 'rooms', currentRoomId), { status: 'playing', round: 1 });
+        };
+
+        function processOnlineState() {
+            if(!onlineState) return;
+            const players = onlineState.players;
+            const playerCount = Object.keys(players).length;
+            if(onlineState.status === 'waiting') {
+                document.getElementById('display-room-code').innerText = onlineState.id;
+                const listDiv = document.getElementById('waiting-players-list');
+                listDiv.innerHTML = '';
+                Object.entries(players).forEach(([uid, p]) => {
+                    listDiv.innerHTML += `<div class="bg-gray-900 p-4 rounded-xl border border-gray-800 flex justify-between"><span><i class="fas fa-user"></i> ${p.name} ${uid===onlineState.host?'(房主)':''}</span><span class="text-emerald-400 text-xs">已就緒</span></div>`;
+                });
+                const startBtn = document.getElementById('btn-start-game');
+                if(isHost) {
+                    startBtn.classList.remove('hidden');
+                    if(playerCount >= 2 && playerCount <= 6) {
+                        startBtn.disabled = false;
+                        startBtn.innerText = `開始賽局 (${playerCount}人)`;
+                        startBtn.className = "w-full py-4 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-black text-white";
+                    } else {
+                        startBtn.disabled = true;
+                        startBtn.innerText = `等待至少2人 (目前${playerCount}人)`;
+                        startBtn.className = "w-full py-4 bg-gray-800 text-gray-500 rounded-2xl cursor-not-allowed";
+                    }
+                } else {
+                    startBtn.classList.remove('hidden');
+                    startBtn.disabled = true;
+                    startBtn.innerText = playerCount>=2 ? "等待房主開始..." : `等待玩家加入 (${playerCount}/2+)`;
+                    startBtn.className = "w-full py-4 bg-gray-800 text-gray-500 rounded-2xl cursor-not-allowed";
+                }
+                if(!document.getElementById('screen-waiting').classList.contains('hidden-screen')) showScreen('screen-waiting');
+            } 
+            else if(onlineState.status === 'playing') {
+                const mySubmitted = onlineState.currentChoices && onlineState.currentChoices[myId];
+                if(!mySubmitted) prepareGameUI(players, onlineState.round, onlineState.coopStreaks||{}, onlineState.attackStreaks||{});
+            }
+            else if(onlineState.status === 'resolving') showRoundResult(players, onlineState.lastLogs, onlineState.round);
+            else if(onlineState.status === 'finished') showFinalResult(players);
+
+            // 房主自動結算及下一輪
+            if(isHost && onlineState.status === 'playing') {
+                const choicesCount = onlineState.currentChoices ? Object.keys(onlineState.currentChoices).length : 0;
+                if(choicesCount === Object.keys(players).length) {
+                    const { updatedPlayers, logs, nextCoopStreaks, nextAttackStreaks } = calculateRound(players, onlineState.currentChoices, onlineState.coopStreaks||{}, onlineState.attackStreaks||{});
+                    const roomRef = doc(db, 'rooms', currentRoomId);
+                    updateDoc(roomRef, {
+                        players: updatedPlayers, lastLogs: logs, coopStreaks: nextCoopStreaks, attackStreaks: nextAttackStreaks,
+                        status: 'resolving', currentChoices: deleteField()
+                    });
+                }
+            }
+            if(isHost && onlineState.status === 'resolving') {
+                let allReady = true;
+                Object.values(players).forEach(p => { if(!p.ready) allReady = false; });
+                if(allReady) {
+                    const roomRef = doc(db, 'rooms', currentRoomId);
+                    if(onlineState.round >= 10) updateDoc(roomRef, { status: 'finished' });
+                    else {
+                        let updates = { status: 'playing', round: onlineState.round+1 };
+                        Object.keys(players).forEach(uid => updates[`players.${uid}.ready`] = false);
+                        updateDoc(roomRef, updates);
+                    }
+                }
+            }
+        }
+
+        // ---------- 使用者認證 ----------
+        onAuthStateChanged(auth, (user) => {
+            if(user) {
+                currentUser = user;
+                myId = user.uid;
+                if(document.getElementById('screen-loading') && !document.getElementById('screen-loading').classList.contains('hidden-screen')) {
+                    showScreen('screen-menu');
+                }
+            } else {
+                signInAnonymously(auth).catch(e => console.warn("匿名登入失敗", e));
+            }
+        });
+        signInAnonymously(auth).catch(e => console.warn);
+        setTimeout(() => { if(!currentUser) showModal('連線狀態','Firebase 連線中，若持續失敗請檢查網路或專案設定'); }, 2000);
     </script>
 </body>
 </html>
